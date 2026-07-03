@@ -1,0 +1,234 @@
+import React, { useState } from 'react';
+import {
+  Alert, Platform, Pressable, ScrollView,
+  StyleSheet, Switch, Text, TextInput, View,
+} from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useColors } from '@/hooks/useColors';
+import { useGameStore } from '@/store/gameStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+type DarkMode = 'light' | 'dark' | 'system';
+
+function SettingRow({ label, children, last }: { label: string; children: React.ReactNode; last?: boolean }) {
+  const colors = useColors();
+  return (
+    <View style={[styles.settingRow, !last && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+      <Text style={[styles.settingLabel, { color: colors.foreground }]}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+export default function SettingsScreen() {
+  const palette = useColors();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const settings = useGameStore(s => s.settings);
+  const { updateSettings, resetGame } = useGameStore();
+  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+
+  const [startingMoneyStr, setStartingMoneyStr] = useState(settings.startingMoney.toString());
+  const [salaryStr, setSalaryStr] = useState(settings.salaryAmount.toString());
+  const [incomeTaxStr, setIncomeTaxStr] = useState(settings.incomeTaxAmount.toString());
+  const [luxuryTaxStr, setLuxuryTaxStr] = useState(settings.luxuryTaxAmount.toString());
+
+  function saveNumbers() {
+    const sm = parseInt(startingMoneyStr);
+    const sal = parseInt(salaryStr);
+    const it = parseInt(incomeTaxStr);
+    const lt = parseInt(luxuryTaxStr);
+    if (!isNaN(sm)) updateSettings({ startingMoney: sm });
+    if (!isNaN(sal)) updateSettings({ salaryAmount: sal });
+    if (!isNaN(it)) updateSettings({ incomeTaxAmount: it });
+    if (!isNaN(lt)) updateSettings({ luxuryTaxAmount: lt });
+  }
+
+  function handleReset() {
+    Alert.alert(
+      'Reset Game',
+      'This will remove all players, transactions, and property ownerships. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reset', style: 'destructive', onPress: () => { resetGame(); router.back(); } },
+      ]
+    );
+  }
+
+  const DARK_MODES: { value: DarkMode; label: string }[] = [
+    { value: 'system', label: 'System' },
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+  ];
+
+  const CURRENCIES = [
+    { value: '$', label: '$ USD' },
+    { value: '€', label: '€ EUR' },
+    { value: '£', label: '£ GBP' },
+    { value: '¥', label: '¥ JPY' },
+    { value: 'M', label: 'M Monopoly' },
+  ];
+
+  function NumInput({ value, onChange, onBlur }: { value: string; onChange: (v: string) => void; onBlur?: () => void }) {
+    return (
+      <TextInput
+        style={[styles.numInput, { color: palette.foreground, borderColor: palette.border, backgroundColor: palette.muted }]}
+        value={value}
+        onChangeText={t => onChange(t.replace(/[^0-9]/g, ''))}
+        onBlur={onBlur}
+        keyboardType="numeric"
+        selectionColor={palette.primary}
+      />
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: palette.background }]}>
+      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: palette.background, borderBottomColor: palette.border }]}>
+        <Pressable onPress={() => { saveNumbers(); router.back(); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color={palette.foreground} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: palette.foreground }]}>Settings</Text>
+        <Pressable onPress={() => { saveNumbers(); router.back(); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+          <Text style={[styles.doneText, { color: palette.primary }]}>Done</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 30 }]}>
+        {/* Appearance */}
+        <Text style={[styles.groupLabel, { color: palette.mutedForeground }]}>Appearance</Text>
+        <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          <SettingRow label="Theme">
+            <View style={styles.segmented}>
+              {DARK_MODES.map(m => (
+                <Pressable
+                  key={m.value}
+                  onPress={() => updateSettings({ darkMode: m.value })}
+                  style={[
+                    styles.segment,
+                    { backgroundColor: settings.darkMode === m.value ? palette.primary : palette.muted },
+                  ]}
+                >
+                  <Text style={[styles.segmentText, { color: settings.darkMode === m.value ? palette.primaryForeground : palette.foreground }]}>
+                    {m.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </SettingRow>
+          <SettingRow label="Currency" last>
+            <View style={styles.chipRow}>
+              {CURRENCIES.map(c => (
+                <Pressable
+                  key={c.value}
+                  onPress={() => updateSettings({ currency: c.value })}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: settings.currency === c.value ? palette.primary + '22' : palette.muted,
+                      borderColor: settings.currency === c.value ? palette.primary : palette.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.chipText, { color: settings.currency === c.value ? palette.primary : palette.foreground }]}>
+                    {c.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </SettingRow>
+        </View>
+
+        {/* Game rules */}
+        <Text style={[styles.groupLabel, { color: palette.mutedForeground }]}>Game Rules</Text>
+        <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          <SettingRow label="Starting Money">
+            <NumInput value={startingMoneyStr} onChange={setStartingMoneyStr} onBlur={() => {
+              const v = parseInt(startingMoneyStr);
+              if (!isNaN(v)) updateSettings({ startingMoney: v });
+            }} />
+          </SettingRow>
+          <SettingRow label="Salary (Pass Go)">
+            <NumInput value={salaryStr} onChange={setSalaryStr} onBlur={() => {
+              const v = parseInt(salaryStr);
+              if (!isNaN(v)) updateSettings({ salaryAmount: v });
+            }} />
+          </SettingRow>
+          <SettingRow label="Income Tax">
+            <NumInput value={incomeTaxStr} onChange={setIncomeTaxStr} onBlur={() => {
+              const v = parseInt(incomeTaxStr);
+              if (!isNaN(v)) updateSettings({ incomeTaxAmount: v });
+            }} />
+          </SettingRow>
+          <SettingRow label="Luxury Tax" last>
+            <NumInput value={luxuryTaxStr} onChange={setLuxuryTaxStr} onBlur={() => {
+              const v = parseInt(luxuryTaxStr);
+              if (!isNaN(v)) updateSettings({ luxuryTaxAmount: v });
+            }} />
+          </SettingRow>
+        </View>
+
+        {/* Optional features */}
+        <Text style={[styles.groupLabel, { color: palette.mutedForeground }]}>Features</Text>
+        <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          <SettingRow label="Free Parking Jackpot" last>
+            <Switch
+              value={settings.freeParking}
+              onValueChange={v => updateSettings({ freeParking: v })}
+              trackColor={{ false: palette.border, true: palette.primary + '88' }}
+              thumbColor={settings.freeParking ? palette.primary : palette.mutedForeground}
+            />
+          </SettingRow>
+        </View>
+
+        {/* Danger zone */}
+        <Text style={[styles.groupLabel, { color: palette.mutedForeground }]}>Danger Zone</Text>
+        <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          <Pressable
+            onPress={handleReset}
+            style={({ pressed }) => [styles.dangerRow, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <MaterialCommunityIcons name="restart" size={20} color={palette.destructive} />
+            <Text style={[styles.dangerText, { color: palette.destructive }]}>Reset Game</Text>
+          </Pressable>
+        </View>
+
+        <Text style={[styles.version, { color: palette.mutedForeground }]}>
+          Monopoly Banker · Unofficial companion app
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 17 },
+  doneText: { fontFamily: 'Inter_700Bold', fontSize: 16 },
+  scroll: { padding: 20, gap: 10 },
+  groupLabel: { fontFamily: 'Inter_500Medium', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 10, marginBottom: 2 },
+  card: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  settingRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 13, gap: 12,
+  },
+  settingLabel: { fontFamily: 'Inter_500Medium', fontSize: 16, flex: 1 },
+  numInput: {
+    borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+    fontFamily: 'Inter_600SemiBold', fontSize: 15, textAlign: 'right', minWidth: 80,
+  },
+  segmented: { flexDirection: 'row', gap: 4, borderRadius: 8, overflow: 'hidden' },
+  segment: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  segmentText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flex: 1, justifyContent: 'flex-end' },
+  chip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  chipText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+  dangerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
+  dangerText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+  version: { fontFamily: 'Inter_400Regular', fontSize: 12, textAlign: 'center', marginTop: 10 },
+});

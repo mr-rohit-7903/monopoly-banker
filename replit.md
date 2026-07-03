@@ -1,6 +1,6 @@
-# [Project name]
+# Monopoly Banker
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A premium offline Monopoly banking companion app for one shared mobile device — handles all money, properties, and transactions so players can focus on the game.
 
 ## Run & Operate
 

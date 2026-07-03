@@ -1,0 +1,298 @@
+Premium Monopoly Banker App (React Native Expo)
+
+Build a production-quality React Native application using Expo that works as a complete Monopoly Banking Companion for one shared mobile device acting as the game's banker.
+
+The application must function 100% offline, be fast, beautiful, and feel like an official premium board game companion app.
+
+Tech Stack
+
+Use:
+
+React Native
+Expo (latest stable version)
+TypeScript
+Expo Router (file-based routing)
+React Query (if needed for async local operations)
+Zustand or Redux Toolkit for state management (prefer Zustand)
+SQLite (expo-sqlite) or Realm for local persistence
+React Native Paper or NativeWind (Material 3 styling preferred)
+React Hook Form
+Zod for validation
+React Native Reanimated (only where beneficial)
+FlashList for high-performance lists
+Core Features
+Player Management
+Create game
+Add players
+Edit player
+Delete player
+Player avatars
+Player colors
+Player cash balance
+Current turn indicator
+Banking
+
+Implement full Monopoly banker functionality.
+
+Support:
+
+Give money
+Receive money
+Transfer between players
+Bank transactions
+Income Tax
+Luxury Tax
+Salary collection
+Mortgage
+Unmortgage
+Loan tracking (optional)
+
+Every transaction must be saved locally.
+
+Provide transaction history.
+
+Allow undo of recent actions.
+
+Property Management
+
+Include the complete Monopoly property dataset.
+
+Support:
+
+Ownership
+Houses
+Hotels
+Mortgage status
+Property value
+Rent value
+Color groups
+Railroads
+Utilities
+
+Allow assigning and transferring ownership.
+
+Transaction History
+
+Maintain a complete ledger.
+
+Support:
+
+Search
+Filters
+Sort by player
+Sort by amount
+Sort by date
+Undo recent transactions
+Statistics Dashboard
+
+Show:
+
+Richest player
+Total money in circulation
+Bank balance
+Property ownership summary
+Player assets
+Charts (optional)
+Game duration
+Number of turns
+Settings
+
+Support:
+
+Dark mode
+Light mode
+System theme
+Sound toggle
+Reset game
+Reset database
+Currency selection
+Custom starting money
+UI Requirements
+
+Design should feel like a premium mobile banking application.
+
+Use:
+
+Material 3
+Rounded cards
+Smooth typography
+Modern spacing
+Large touch targets
+Responsive layouts
+Tablet support
+Phone support
+
+Navigation:
+
+Bottom tabs
+Stack navigation
+Modal screens where appropriate
+Dark Mode
+
+Provide complete dark mode support.
+
+Use a centralized theme system.
+
+No hardcoded colors.
+
+Support automatic switching based on system appearance.
+
+Performance
+
+Everything should feel instant.
+
+Requirements:
+
+No loading screens
+Fully offline
+No internet required
+Fast local database queries
+Optimized re-rendering
+Memoized components where appropriate
+Lazy-load screens if beneficial
+Minimal and purposeful animations only
+Bonus Features
+
+Include:
+
+Custom Monopoly rule presets
+Free Parking jackpot
+Auction timer
+Dice roller
+Random player picker
+Game notes
+Multiple saved games
+Export transaction history as PDF
+Import/Export game backup
+Automatic game recovery
+Code Quality
+
+Follow clean architecture principles.
+
+Separate:
+
+Presentation layer
+UI components
+Business logic
+State management
+Database layer
+Services
+Models
+Utilities
+
+Requirements:
+
+TypeScript throughout
+Reusable components
+Custom hooks
+Proper folder organization
+Context-free business logic
+Repository pattern
+Dependency injection where appropriate
+Centralized constants
+No hardcoded UI values
+Theme-based styling
+Comment complex business logic
+ESLint + Prettier configuration
+Suggested Folder Structure
+src/
+│
+├── app/                  # Expo Router routes
+├── assets/
+│
+├── components/
+│   ├── common/
+│   ├── cards/
+│   ├── forms/
+│   ├── dialogs/
+│   └── charts/
+│
+├── features/
+│   ├── players/
+│   ├── banking/
+│   ├── properties/
+│   ├── transactions/
+│   ├── statistics/
+│   └── settings/
+│
+├── hooks/
+├── navigation/
+├── services/
+├── database/
+│   ├── sqlite/
+│   ├── repositories/
+│   └── migrations/
+│
+├── store/
+│
+├── models/
+├── types/
+├── utils/
+├── constants/
+├── theme/
+├── providers/
+└── data/
+    └── monopoly-properties.json
+Database
+
+Use SQLite (expo-sqlite).
+
+Create normalized tables for:
+
+Games
+Players
+Transactions
+Properties
+Settings
+Notes
+Rule presets
+
+Implement migrations.
+
+Use repository classes to abstract database access.
+
+Responsive Design
+
+Support:
+
+Android phones
+Android tablets
+iPhones
+iPads
+
+Adapt layouts for larger screens.
+
+Respect safe areas.
+
+Material 3
+
+Use Material Design 3 components and design principles throughout.
+
+Support dynamic color themes where available.
+
+Deliverables
+
+Produce a complete Expo project including:
+
+Full source code
+TypeScript implementation
+Expo Router setup
+Folder structure
+SQLite database
+Monopoly property dataset
+Responsive UI
+Material 3 design
+Light mode
+Dark mode
+Local persistence
+Clean architecture
+Ready to run with:
+npm install
+npx expo start
+
+or
+
+bun install
+npx expo start
+
+The final application should feel like an official premium Monopoly banking companion app, optimized for a single shared mobile device acting as the game's banker, with polished UX, instant performance, robust offline functionality, maintainable architecture, and production-ready code quality.
