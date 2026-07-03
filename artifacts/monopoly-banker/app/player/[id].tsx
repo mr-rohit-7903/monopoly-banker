@@ -26,7 +26,7 @@ export default function PlayerDetailScreen() {
   const allPlayers = useGameStore(s => s.players);
   const transactions = useGameStore(s => s.transactions);
   const currency = useGameStore(s => s.settings.currency);
-  const { updatePlayer, removePlayer, transfer, adjustBalance } = useGameStore();
+  const { updatePlayer, removePlayer, transfer } = useGameStore();
 
   const [name, setName] = useState(player?.name ?? '');
   const [selectedColor, setSelectedColor] = useState(player?.color ?? PLAYER_COLORS[0]);

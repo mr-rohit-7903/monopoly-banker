@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Alert, Platform, Pressable, ScrollView,
-  StyleSheet, Switch, Text, TextInput, View,
+  StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -14,7 +14,10 @@ type DarkMode = 'light' | 'dark' | 'system';
 function SettingRow({ label, children, last }: { label: string; children: React.ReactNode; last?: boolean }) {
   const colors = useColors();
   return (
-    <View style={[styles.settingRow, !last && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+    <View style={[
+      styles.settingRow,
+      !last && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
+    ]}>
       <Text style={[styles.settingLabel, { color: colors.foreground }]}>{label}</Text>
       {children}
     </View>
@@ -33,17 +36,6 @@ export default function SettingsScreen() {
   const [salaryStr, setSalaryStr] = useState(settings.salaryAmount.toString());
   const [incomeTaxStr, setIncomeTaxStr] = useState(settings.incomeTaxAmount.toString());
   const [luxuryTaxStr, setLuxuryTaxStr] = useState(settings.luxuryTaxAmount.toString());
-
-  function saveNumbers() {
-    const sm = parseInt(startingMoneyStr);
-    const sal = parseInt(salaryStr);
-    const it = parseInt(incomeTaxStr);
-    const lt = parseInt(luxuryTaxStr);
-    if (!isNaN(sm)) updateSettings({ startingMoney: sm });
-    if (!isNaN(sal)) updateSettings({ salaryAmount: sal });
-    if (!isNaN(it)) updateSettings({ incomeTaxAmount: it });
-    if (!isNaN(lt)) updateSettings({ luxuryTaxAmount: lt });
-  }
 
   function handleReset() {
     Alert.alert(
@@ -86,11 +78,11 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: palette.background, borderBottomColor: palette.border }]}>
-        <Pressable onPress={() => { saveNumbers(); router.back(); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+        <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={palette.foreground} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.foreground }]}>Settings</Text>
-        <Pressable onPress={() => { saveNumbers(); router.back(); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+        <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <Text style={[styles.doneText, { color: palette.primary }]}>Done</Text>
         </Pressable>
       </View>
@@ -169,19 +161,6 @@ export default function SettingsScreen() {
           </SettingRow>
         </View>
 
-        {/* Optional features */}
-        <Text style={[styles.groupLabel, { color: palette.mutedForeground }]}>Features</Text>
-        <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
-          <SettingRow label="Free Parking Jackpot" last>
-            <Switch
-              value={settings.freeParking}
-              onValueChange={v => updateSettings({ freeParking: v })}
-              trackColor={{ false: palette.border, true: palette.primary + '88' }}
-              thumbColor={settings.freeParking ? palette.primary : palette.mutedForeground}
-            />
-          </SettingRow>
-        </View>
-
         {/* Danger zone */}
         <Text style={[styles.groupLabel, { color: palette.mutedForeground }]}>Danger Zone</Text>
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
@@ -222,7 +201,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
     fontFamily: 'Inter_600SemiBold', fontSize: 15, textAlign: 'right', minWidth: 80,
   },
-  segmented: { flexDirection: 'row', gap: 4, borderRadius: 8, overflow: 'hidden' },
+  segmented: { flexDirection: 'row', gap: 4 },
   segment: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   segmentText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flex: 1, justifyContent: 'flex-end' },

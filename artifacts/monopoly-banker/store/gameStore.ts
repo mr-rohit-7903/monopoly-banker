@@ -19,7 +19,7 @@ export type TransactionType =
   | 'salary' | 'income_tax' | 'luxury_tax'
   | 'mortgage' | 'unmortgage'
   | 'property_buy' | 'property_sell'
-  | 'free_parking_add' | 'free_parking_collect';
+  | 'ticket_buy' | 'ticket_win';
 
 export interface Transaction {
   id: string;
@@ -33,7 +33,6 @@ export interface Transaction {
   propertyId?: string;
   prevMortgaged?: boolean;
   prevOwnerId?: string | null;
-  freeParkingDelta?: number;
 }
 
 export interface PropertyOwnership {
@@ -47,7 +46,6 @@ export interface GameSettings {
   startingMoney: number;
   currency: string;
   darkMode: 'light' | 'dark' | 'system';
-  freeParking: boolean;
   salaryAmount: number;
   incomeTaxAmount: number;
   luxuryTaxAmount: number;
@@ -57,7 +55,6 @@ const DEFAULT_SETTINGS: GameSettings = {
   startingMoney: STANDARD_STARTING_MONEY,
   currency: '$',
   darkMode: 'system',
-  freeParking: true,
   salaryAmount: SALARY_AMOUNT,
   incomeTaxAmount: INCOME_TAX_AMOUNT,
   luxuryTaxAmount: LUXURY_TAX_AMOUNT,
@@ -77,28 +74,27 @@ interface GameState {
   propertyOwnerships: Record<string, PropertyOwnership>;
   settings: GameSettings;
   bankBalance: number;
-  freeParkingBalance: number;
   gameStartTime: number;
 
-  // Actions
+  // Player actions
   addPlayer: (name: string, color: string) => void;
   removePlayer: (id: string) => void;
   updatePlayer: (id: string, updates: { name?: string; color?: string }) => void;
-  adjustBalance: (playerId: string, amount: number) => void;
 
+  // Banking actions
   transfer: (fromId: string | null, toId: string | null, amount: number, type: TransactionType, description: string) => boolean;
   undoLastTransaction: () => void;
-
   collectSalary: (playerId: string) => void;
-  payIncomeTax: (playerId: string) => void;
-  payLuxuryTax: (playerId: string) => void;
-  addToFreeParking: (playerId: string, amount: number) => void;
-  collectFreeParking: (playerId: string) => void;
 
+  // Ticket actions
+  buyTicket: (playerId: string, ticketPrice: number, ticketLabel: string, prizeMultiplier: number) => void;
+
+  // Property actions
   assignProperty: (propertyId: string, ownerId: string | null, price: number) => void;
   setHouses: (propertyId: string, houses: number, hotel: boolean) => void;
   toggleMortgage: (propertyId: string) => void;
 
+  // Game actions
   resetGame: () => void;
   updateSettings: (updates: Partial<GameSettings>) => void;
 }
@@ -111,7 +107,6 @@ export const useGameStore = create<GameState>()(
       propertyOwnerships: initOwnerships(),
       settings: DEFAULT_SETTINGS,
       bankBalance: BANK_STARTING_BALANCE,
-      freeParkingBalance: 0,
       gameStartTime: Date.now(),
 
       addPlayer: (name, color) => set(state => ({
@@ -151,16 +146,8 @@ export const useGameStore = create<GameState>()(
         players: state.players.map(p => p.id === id ? { ...p, ...updates } : p),
       })),
 
-      adjustBalance: (playerId, amount) => set(state => ({
-        players: state.players.map(p =>
-          p.id === playerId ? { ...p, balance: p.balance + amount } : p
-        ),
-        bankBalance: state.bankBalance - amount,
-      })),
-
       transfer: (fromId, toId, amount, type, description) => {
         const state = get();
-        // Validate
         if (amount <= 0) return false;
         if (fromId !== null) {
           const from = state.players.find(p => p.id === fromId);
@@ -206,18 +193,9 @@ export const useGameStore = create<GameState>()(
 
         let players = [...state.players];
         let bankBalance = state.bankBalance;
-        let freeParkingBalance = state.freeParkingBalance;
         let propertyOwnerships = { ...state.propertyOwnerships };
 
-        if (type === 'free_parking_add') {
-          // Reverse: remove from free parking, give back to player
-          freeParkingBalance -= amount;
-          players = players.map(p => p.id === fromId ? { ...p, balance: p.balance + amount } : p);
-        } else if (type === 'free_parking_collect') {
-          // Reverse: remove from player, restore to free parking
-          freeParkingBalance += amount;
-          players = players.map(p => p.id === toId ? { ...p, balance: p.balance - amount } : p);
-        } else if (type === 'mortgage' || type === 'unmortgage') {
+        if (type === 'mortgage' || type === 'unmortgage') {
           if (last.propertyId) {
             propertyOwnerships = {
               ...propertyOwnerships,
@@ -227,15 +205,9 @@ export const useGameStore = create<GameState>()(
               },
             };
           }
-          // Reverse money
-          if (fromId === null && toId !== null) {
-            players = players.map(p => p.id === toId ? { ...p, balance: p.balance - amount } : p);
-            bankBalance += amount;
-          } else if (fromId !== null && toId === null) {
-            players = players.map(p => p.id === fromId ? { ...p, balance: p.balance + amount } : p);
-            bankBalance -= amount;
-          }
-        } else if (type === 'property_buy' || type === 'property_sell') {
+        }
+
+        if (type === 'property_buy' || type === 'property_sell') {
           if (last.propertyId) {
             propertyOwnerships = {
               ...propertyOwnerships,
@@ -245,32 +217,24 @@ export const useGameStore = create<GameState>()(
               },
             };
           }
-          // Reverse money
-          if (fromId === null && toId !== null) {
-            players = players.map(p => p.id === toId ? { ...p, balance: p.balance - amount } : p);
-            bankBalance += amount;
-          } else if (fromId !== null && toId === null) {
-            players = players.map(p => p.id === fromId ? { ...p, balance: p.balance + amount } : p);
-            bankBalance -= amount;
-          }
-        } else {
-          // Standard money reversal
-          if (fromId === null && toId !== null) {
-            players = players.map(p => p.id === toId ? { ...p, balance: p.balance - amount } : p);
-            bankBalance += amount;
-          } else if (fromId !== null && toId === null) {
-            players = players.map(p => p.id === fromId ? { ...p, balance: p.balance + amount } : p);
-            bankBalance -= amount;
-          } else if (fromId !== null && toId !== null) {
-            players = players.map(p => {
-              if (p.id === fromId) return { ...p, balance: p.balance + amount };
-              if (p.id === toId) return { ...p, balance: p.balance - amount };
-              return p;
-            });
-          }
         }
 
-        return { players, bankBalance, freeParkingBalance, propertyOwnerships, transactions };
+        // Reverse the money flow
+        if (fromId === null && toId !== null) {
+          players = players.map(p => p.id === toId ? { ...p, balance: p.balance - amount } : p);
+          bankBalance += amount;
+        } else if (fromId !== null && toId === null) {
+          players = players.map(p => p.id === fromId ? { ...p, balance: p.balance + amount } : p);
+          bankBalance -= amount;
+        } else if (fromId !== null && toId !== null) {
+          players = players.map(p => {
+            if (p.id === fromId) return { ...p, balance: p.balance + amount };
+            if (p.id === toId) return { ...p, balance: p.balance - amount };
+            return p;
+          });
+        }
+
+        return { players, bankBalance, propertyOwnerships, transactions };
       }),
 
       collectSalary: (playerId) => {
@@ -278,45 +242,44 @@ export const useGameStore = create<GameState>()(
         transfer(null, playerId, settings.salaryAmount, 'salary', 'Salary — passed Go');
       },
 
-      payIncomeTax: (playerId) => {
-        const { settings, transfer } = get();
-        transfer(playerId, null, settings.incomeTaxAmount, 'income_tax', 'Income Tax');
-      },
-
-      payLuxuryTax: (playerId) => {
-        const { settings, transfer } = get();
-        transfer(playerId, null, settings.luxuryTaxAmount, 'luxury_tax', 'Luxury Tax');
-      },
-
-      addToFreeParking: (playerId, amount) => set(state => {
+      buyTicket: (playerId, ticketPrice, ticketLabel, prizeMultiplier) => set(state => {
         const player = state.players.find(p => p.id === playerId);
-        if (!player || player.balance < amount) return state;
-        return {
-          players: state.players.map(p =>
-            p.id === playerId ? { ...p, balance: p.balance - amount } : p
-          ),
-          freeParkingBalance: state.freeParkingBalance + amount,
-          transactions: [...state.transactions, {
-            id: genId(), type: 'free_parking_add', fromId: playerId, toId: null,
-            amount, description: 'Added to Free Parking', timestamp: Date.now(),
-            freeParkingDelta: amount,
-          }],
-        };
-      }),
+        if (!player || player.balance < ticketPrice) return state;
 
-      collectFreeParking: (playerId) => set(state => {
-        const amount = state.freeParkingBalance;
-        if (amount === 0) return state;
+        const winAmount = ticketPrice * prizeMultiplier;
+        const netForPlayer = -ticketPrice + winAmount;
+        const netForBank = ticketPrice - winAmount;
+
+        const newTransactions: Transaction[] = [
+          {
+            id: genId(),
+            type: 'ticket_buy',
+            fromId: playerId,
+            toId: null,
+            amount: ticketPrice,
+            description: `Bought ${ticketLabel}`,
+            timestamp: Date.now(),
+          },
+        ];
+
+        if (winAmount > 0) {
+          newTransactions.push({
+            id: genId(),
+            type: 'ticket_win',
+            fromId: null,
+            toId: playerId,
+            amount: winAmount,
+            description: `${ticketLabel} — ${prizeMultiplier}x prize!`,
+            timestamp: Date.now() + 1,
+          });
+        }
+
         return {
           players: state.players.map(p =>
-            p.id === playerId ? { ...p, balance: p.balance + amount } : p
+            p.id === playerId ? { ...p, balance: p.balance + netForPlayer } : p
           ),
-          freeParkingBalance: 0,
-          transactions: [...state.transactions, {
-            id: genId(), type: 'free_parking_collect', fromId: null, toId: playerId,
-            amount, description: 'Collected Free Parking', timestamp: Date.now(),
-            freeParkingDelta: -amount,
-          }],
+          bankBalance: state.bankBalance + netForBank,
+          transactions: [...state.transactions, ...newTransactions],
         };
       }),
 
@@ -328,7 +291,6 @@ export const useGameStore = create<GameState>()(
         const transactions = [...state.transactions];
 
         if (ownerId !== null && price > 0) {
-          // Player buys from bank — check funds first
           const buyer = state.players.find(p => p.id === ownerId);
           if (!buyer || buyer.balance < price) return state;
           players = players.map(p => p.id === ownerId ? { ...p, balance: p.balance - price } : p);
@@ -339,7 +301,6 @@ export const useGameStore = create<GameState>()(
             timestamp: Date.now(), propertyId, prevOwnerId,
           });
         } else if (ownerId === null && prevOwnerId !== null && price > 0) {
-          // Player sells back to bank
           players = players.map(p => p.id === prevOwnerId ? { ...p, balance: p.balance + price } : p);
           bankBalance -= price;
           transactions.push({
@@ -376,6 +337,12 @@ export const useGameStore = create<GameState>()(
         const ownerId = ownership.ownerId;
         const mortgageValue = property.mortgage;
         const unmortgageCost = Math.floor(mortgageValue * 1.1);
+
+        if (!isMortgaging) {
+          const owner = state.players.find(p => p.id === ownerId);
+          if (!owner || owner.balance < unmortgageCost) return state;
+        }
+
         const amount = isMortgaging ? mortgageValue : unmortgageCost;
 
         return {
@@ -407,7 +374,6 @@ export const useGameStore = create<GameState>()(
         transactions: [],
         propertyOwnerships: initOwnerships(),
         bankBalance: BANK_STARTING_BALANCE,
-        freeParkingBalance: 0,
         gameStartTime: Date.now(),
       }),
 
@@ -416,7 +382,7 @@ export const useGameStore = create<GameState>()(
       })),
     }),
     {
-      name: 'monopoly-banker-v1',
+      name: 'monopoly-banker-v2',
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

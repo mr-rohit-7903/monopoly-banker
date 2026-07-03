@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Alert, FlatList, Platform, Pressable, ScrollView,
+  Platform, Pressable, ScrollView,
   StyleSheet, Text, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -19,9 +19,7 @@ export default function PlayersScreen() {
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players);
   const bankBalance = useGameStore(s => s.bankBalance);
-  const freeParkingBalance = useGameStore(s => s.freeParkingBalance);
   const currency = useGameStore(s => s.settings.currency);
-  const freeParking = useGameStore(s => s.settings.freeParking);
   const [diceVisible, setDiceVisible] = useState(false);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -58,28 +56,15 @@ export default function PlayersScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Bank + Free Parking cards */}
-        <View style={styles.bankRow}>
-          <View style={[styles.bankCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <MaterialCommunityIcons name="bank" size={20} color={colors.primary} />
-            <View>
-              <Text style={[styles.bankLabel, { color: colors.mutedForeground }]}>Bank</Text>
-              <Text style={[styles.bankAmount, { color: colors.foreground }]}>
-                {formatMoney(bankBalance, currency)}
-              </Text>
-            </View>
+        {/* Bank card */}
+        <View style={[styles.bankCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <MaterialCommunityIcons name="bank" size={22} color={colors.primary} />
+          <View>
+            <Text style={[styles.bankLabel, { color: colors.mutedForeground }]}>Bank Balance</Text>
+            <Text style={[styles.bankAmount, { color: colors.foreground }]}>
+              {formatMoney(bankBalance, currency)}
+            </Text>
           </View>
-          {freeParking && (
-            <View style={[styles.bankCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <MaterialCommunityIcons name="car-clock" size={20} color={colors.accent} />
-              <View>
-                <Text style={[styles.bankLabel, { color: colors.mutedForeground }]}>Free Parking</Text>
-                <Text style={[styles.bankAmount, { color: colors.foreground }]}>
-                  {formatMoney(freeParkingBalance, currency)}
-                </Text>
-              </View>
-            </View>
-          )}
         </View>
 
         {/* Players list */}
@@ -92,7 +77,7 @@ export default function PlayersScreen() {
             </Text>
           </View>
         ) : (
-          <View style={styles.list}>
+          <View>
             {players.map(player => (
               <PlayerCard
                 key={player.id}
@@ -141,17 +126,15 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', gap: 10 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: 16, gap: 16 },
-  bankRow: { flexDirection: 'row', gap: 10 },
   bankCard: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 14, borderRadius: 14, borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 16, borderRadius: 14, borderWidth: 1,
   },
-  bankLabel: { fontFamily: 'Inter_400Regular', fontSize: 12 },
-  bankAmount: { fontFamily: 'Inter_700Bold', fontSize: 16 },
+  bankLabel: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  bankAmount: { fontFamily: 'Inter_700Bold', fontSize: 22 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTitle: { fontFamily: 'Inter_700Bold', fontSize: 20 },
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 15, textAlign: 'center' },
-  list: { gap: 0 },
   fab: {
     position: 'absolute',
     right: 20,

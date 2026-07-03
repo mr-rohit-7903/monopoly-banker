@@ -14,7 +14,6 @@ export default function StatsScreen() {
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players);
   const bankBalance = useGameStore(s => s.bankBalance);
-  const freeParkingBalance = useGameStore(s => s.freeParkingBalance);
   const transactions = useGameStore(s => s.transactions);
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
   const currency = useGameStore(s => s.settings.currency);
@@ -47,6 +46,10 @@ export default function StatsScreen() {
   const totalTransactions = transactions.length;
   const ownedProperties = Object.values(propertyOwnerships).filter(o => o.ownerId !== null).length;
   const mortgagedProperties = Object.values(propertyOwnerships).filter(o => o.isMortgaged).length;
+  const ticketsBought = transactions.filter(t => t.type === 'ticket_buy').length;
+  const ticketWinnings = transactions
+    .filter(t => t.type === 'ticket_win')
+    .reduce((sum, t) => sum + t.amount, 0);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -101,9 +104,9 @@ export default function StatsScreen() {
             </View>
             <View style={styles.grid}>
               <StatCard
-                label="Free Parking"
-                value={formatMoney(freeParkingBalance, currency)}
-                icon="car-clock"
+                label="Tickets Bought"
+                value={ticketsBought.toString()}
+                icon="ticket-outline"
                 accent
               />
               <StatCard
@@ -112,6 +115,14 @@ export default function StatsScreen() {
                 icon="timer"
               />
             </View>
+            {ticketWinnings > 0 && (
+              <StatCard
+                label="Total Ticket Winnings"
+                value={formatMoney(ticketWinnings, currency)}
+                icon="ticket-percent"
+                fullWidth
+              />
+            )}
             <View style={styles.grid}>
               <StatCard
                 label="Transactions"
