@@ -5,6 +5,7 @@ import { useColors } from '@/hooks/useColors';
 import { Transaction } from '@/store/gameStore';
 import { formatMoney, timeAgo } from '@/utils/format';
 import { useGameStore } from '@/store/gameStore';
+import { CHANCE_COLOR, COMMUNITY_COLOR } from './CardDrawModal';
 
 interface Props {
   transaction: Transaction;
@@ -12,31 +13,31 @@ interface Props {
 
 function getIcon(type: Transaction['type']): keyof typeof MaterialCommunityIcons.glyphMap {
   switch (type) {
-    case 'salary':        return 'cash-plus';
-    case 'income_tax':    return 'file-document';
-    case 'luxury_tax':    return 'diamond';
-    case 'mortgage':      return 'bank-minus';
-    case 'unmortgage':    return 'bank-plus';
-    case 'property_buy':  return 'home-plus';
-    case 'property_sell': return 'home-minus';
-    case 'ticket_buy':    return 'ticket-outline';
-    case 'ticket_win':    return 'ticket-percent';
-    case 'bank_give':     return 'bank-transfer-out';
-    case 'bank_receive':  return 'bank-transfer-in';
-    default:              return 'swap-horizontal';
+    case 'salary':         return 'cash-plus';
+    case 'income_tax':     return 'file-document';
+    case 'luxury_tax':     return 'diamond';
+    case 'mortgage':       return 'bank-minus';
+    case 'unmortgage':     return 'bank-plus';
+    case 'property_buy':   return 'home-plus';
+    case 'property_sell':  return 'home-minus';
+    case 'chance_card':    return 'cards-playing-outline';
+    case 'community_card': return 'cards-playing';
+    case 'bank_give':      return 'bank-transfer-out';
+    case 'bank_receive':   return 'bank-transfer-in';
+    default:               return 'swap-horizontal';
   }
 }
 
 function getIconColor(type: Transaction['type'], colors: ReturnType<typeof useColors>): string {
   switch (type) {
     case 'income_tax':
-    case 'luxury_tax':
-    case 'ticket_buy':    return colors.warning;
+    case 'luxury_tax':    return colors.warning;
     case 'salary':
-    case 'bank_give':
-    case 'ticket_win':    return colors.success;
+    case 'bank_give':     return colors.success;
     case 'property_buy':  return colors.primary;
     case 'mortgage':      return colors.destructive;
+    case 'chance_card':   return CHANCE_COLOR;
+    case 'community_card': return COMMUNITY_COLOR;
     default:              return colors.primary;
   }
 }

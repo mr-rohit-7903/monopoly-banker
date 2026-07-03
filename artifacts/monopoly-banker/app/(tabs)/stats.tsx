@@ -31,7 +31,7 @@ export default function StatsScreen() {
 
   const gameDuration = Date.now() - gameStartTime;
 
-  // Property ownership per player
+  // Property stats
   const playerPropertyCounts = players.map(p => ({
     player: p,
     count: Object.values(propertyOwnerships).filter(o => o.ownerId === p.id).length,
@@ -46,10 +46,11 @@ export default function StatsScreen() {
   const totalTransactions = transactions.length;
   const ownedProperties = Object.values(propertyOwnerships).filter(o => o.ownerId !== null).length;
   const mortgagedProperties = Object.values(propertyOwnerships).filter(o => o.isMortgaged).length;
-  const ticketsBought = transactions.filter(t => t.type === 'ticket_buy').length;
-  const ticketWinnings = transactions
-    .filter(t => t.type === 'ticket_win')
-    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Card draw stats
+  const chanceDraws = transactions.filter(t => t.type === 'chance_card').length;
+  const communityDraws = transactions.filter(t => t.type === 'community_card').length;
+  const totalCardDraws = chanceDraws + communityDraws;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -71,7 +72,7 @@ export default function StatsScreen() {
           </View>
         ) : (
           <>
-            {/* Richest / Poorest */}
+            {/* Richest player hero */}
             {richest && (
               <View style={[styles.heroCard, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '44' }]}>
                 <View style={styles.heroContent}>
@@ -88,7 +89,7 @@ export default function StatsScreen() {
               </View>
             )}
 
-            {/* Quick stats grid */}
+            {/* Quick stats */}
             <View style={styles.grid}>
               <StatCard
                 label="In Circulation"
@@ -102,11 +103,12 @@ export default function StatsScreen() {
                 accent
               />
             </View>
+
             <View style={styles.grid}>
               <StatCard
-                label="Tickets Bought"
-                value={ticketsBought.toString()}
-                icon="ticket-outline"
+                label="Cards Drawn"
+                value={totalCardDraws.toString()}
+                icon="cards"
                 accent
               />
               <StatCard
@@ -115,14 +117,22 @@ export default function StatsScreen() {
                 icon="timer"
               />
             </View>
-            {ticketWinnings > 0 && (
-              <StatCard
-                label="Total Ticket Winnings"
-                value={formatMoney(ticketWinnings, currency)}
-                icon="ticket-percent"
-                fullWidth
-              />
+
+            {totalCardDraws > 0 && (
+              <View style={styles.grid}>
+                <StatCard
+                  label="Chance Draws"
+                  value={chanceDraws.toString()}
+                  icon="cards-playing-outline"
+                />
+                <StatCard
+                  label="Community Chest"
+                  value={communityDraws.toString()}
+                  icon="cards-playing"
+                />
+              </View>
             )}
+
             <View style={styles.grid}>
               <StatCard
                 label="Transactions"
@@ -135,6 +145,7 @@ export default function StatsScreen() {
                 icon="home-group"
               />
             </View>
+
             {mortgagedProperties > 0 && (
               <StatCard
                 label="Mortgaged Properties"
@@ -145,63 +156,66 @@ export default function StatsScreen() {
             )}
 
             {/* Net Worth Leaderboard */}
-            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Net Worth</Text>
-            <View style={[styles.leaderboard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {playerPropertyCounts.map((item, i) => (
-                <View
-                  key={item.player.id}
-                  style={[
-                    styles.leaderRow,
-                    i < playerPropertyCounts.length - 1 && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
-                  ]}
-                >
-                  <Text style={[styles.rank, { color: colors.mutedForeground }]}>#{i + 1}</Text>
-                  <PlayerAvatar name={item.player.name} color={item.player.color} size={36} />
-                  <View style={styles.leaderInfo}>
-                    <Text style={[styles.leaderName, { color: colors.foreground }]}>{item.player.name}</Text>
-                    <Text style={[styles.leaderSub, { color: colors.mutedForeground }]}>
-                      {formatMoney(item.player.balance, currency)} cash · {item.count} properties
+            {playerPropertyCounts.length > 0 && (
+              <View style={[styles.leaderboard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.leaderboardTitle, { color: colors.foreground }]}>Net Worth Leaderboard</Text>
+                {playerPropertyCounts.map((item, index) => (
+                  <View key={item.player.id} style={[styles.leaderRow, index < playerPropertyCounts.length - 1 && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+                    <Text style={[styles.rankNum, { color: index === 0 ? colors.accent : colors.mutedForeground }]}>
+                      {index === 0 ? '👑' : `#${index + 1}`}
+                    </Text>
+                    <PlayerAvatar name={item.player.name} color={item.player.color} size={32} />
+                    <View style={styles.leaderInfo}>
+                      <Text style={[styles.leaderName, { color: colors.foreground }]}>{item.player.name}</Text>
+                      <Text style={[styles.leaderSub, { color: colors.mutedForeground }]}>
+                        {formatMoney(item.player.balance, currency)} cash · {item.count} {item.count === 1 ? 'property' : 'properties'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.leaderNetWorth, { color: index === 0 ? colors.primary : colors.foreground }]}>
+                      {formatMoney(item.netWorth, currency)}
                     </Text>
                   </View>
-                  <Text style={[styles.leaderNet, { color: colors.primary }]}>
-                    {formatMoney(item.netWorth, currency)}
-                  </Text>
-                </View>
-              ))}
-            </View>
+                ))}
+              </View>
+            )}
 
-            {/* Cash breakdown bar */}
+            {/* Cash share bar */}
             {players.length > 1 && totalInCirculation > 0 && (
-              <>
-                <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Cash Share</Text>
-                <View style={[styles.barCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={styles.bar}>
-                    {players.map(p => (
-                      <View
-                        key={p.id}
-                        style={[
-                          styles.barSegment,
-                          {
-                            backgroundColor: p.color,
-                            flex: p.balance / totalInCirculation,
-                          },
-                        ]}
-                      />
-                    ))}
-                  </View>
-                  <View style={styles.legend}>
-                    {players.map(p => (
-                      <View key={p.id} style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: p.color }]} />
-                        <Text style={[styles.legendText, { color: colors.foreground }]}>{p.name}</Text>
-                        <Text style={[styles.legendPct, { color: colors.mutedForeground }]}>
-                          {Math.round((p.balance / totalInCirculation) * 100)}%
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
+              <View style={[styles.shareBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.leaderboardTitle, { color: colors.foreground }]}>Cash Share</Text>
+                <View style={styles.barContainer}>
+                  {players.map(p => (
+                    <View
+                      key={p.id}
+                      style={[
+                        styles.barSegment,
+                        { backgroundColor: p.color, flex: p.balance / totalInCirculation },
+                      ]}
+                    />
+                  ))}
                 </View>
-              </>
+                <View style={styles.barLegend}>
+                  {players.map(p => (
+                    <View key={p.id} style={styles.barLegendRow}>
+                      <View style={[styles.barLegendDot, { backgroundColor: p.color }]} />
+                      <Text style={[styles.barLegendName, { color: colors.foreground }]}>{p.name}</Text>
+                      <Text style={[styles.barLegendPct, { color: colors.mutedForeground }]}>
+                        {Math.round((p.balance / totalInCirculation) * 100)}%
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Poorest warning */}
+            {poorest && players.length > 1 && poorest.balance < 100 && (
+              <View style={[styles.warningCard, { backgroundColor: colors.warning + '18', borderColor: colors.warning + '55' }]}>
+                <MaterialCommunityIcons name="alert" size={20} color={colors.warning} />
+                <Text style={[styles.warningText, { color: colors.foreground }]}>
+                  {poorest.name} is running low — {formatMoney(poorest.balance, currency)} remaining
+                </Text>
+              </View>
             )}
           </>
         )}
@@ -215,30 +229,32 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 28 },
   scroll: { padding: 16, gap: 14 },
-  heroCard: { borderRadius: 18, borderWidth: 1, padding: 20 },
-  heroContent: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  heroText: { flex: 1, gap: 2 },
-  heroLabel: { fontFamily: 'Inter_400Regular', fontSize: 13 },
-  heroName: { fontFamily: 'Inter_700Bold', fontSize: 20 },
-  heroValue: { fontFamily: 'Inter_700Bold', fontSize: 22 },
-  grid: { flexDirection: 'row', gap: 12 },
-  sectionLabel: { fontFamily: 'Inter_700Bold', fontSize: 18 },
-  leaderboard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  leaderRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  rank: { fontFamily: 'Inter_700Bold', fontSize: 16, width: 28, textAlign: 'center' },
-  leaderInfo: { flex: 1 },
-  leaderName: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
-  leaderSub: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 1 },
-  leaderNet: { fontFamily: 'Inter_700Bold', fontSize: 16 },
-  barCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 14 },
-  bar: { flexDirection: 'row', height: 14, borderRadius: 7, overflow: 'hidden' },
-  barSegment: { height: '100%' },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
-  legendPct: { fontFamily: 'Inter_400Regular', fontSize: 12 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, gap: 12 },
+  empty: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTitle: { fontFamily: 'Inter_700Bold', fontSize: 20 },
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 15, textAlign: 'center' },
+  heroCard: { borderRadius: 18, borderWidth: 1, padding: 20 },
+  heroContent: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  heroText: { flex: 1 },
+  heroLabel: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  heroName: { fontFamily: 'Inter_700Bold', fontSize: 22, marginTop: 2 },
+  heroValue: { fontFamily: 'Inter_700Bold', fontSize: 18, marginTop: 4 },
+  grid: { flexDirection: 'row', gap: 12 },
+  leaderboard: { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  leaderboardTitle: { fontFamily: 'Inter_700Bold', fontSize: 16, padding: 16, paddingBottom: 12 },
+  leaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
+  rankNum: { fontFamily: 'Inter_700Bold', fontSize: 16, width: 28, textAlign: 'center' },
+  leaderInfo: { flex: 1 },
+  leaderName: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
+  leaderSub: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 2 },
+  leaderNetWorth: { fontFamily: 'Inter_700Bold', fontSize: 15 },
+  shareBar: { borderRadius: 18, borderWidth: 1, padding: 16, gap: 12 },
+  barContainer: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', gap: 2 },
+  barSegment: { borderRadius: 3 },
+  barLegend: { gap: 6 },
+  barLegendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  barLegendDot: { width: 10, height: 10, borderRadius: 5 },
+  barLegendName: { fontFamily: 'Inter_400Regular', fontSize: 13, flex: 1 },
+  barLegendPct: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  warningCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 14, borderWidth: 1 },
+  warningText: { fontFamily: 'Inter_400Regular', fontSize: 14, flex: 1 },
 });

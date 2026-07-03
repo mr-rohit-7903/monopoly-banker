@@ -19,7 +19,7 @@ export type TransactionType =
   | 'salary' | 'income_tax' | 'luxury_tax'
   | 'mortgage' | 'unmortgage'
   | 'property_buy' | 'property_sell'
-  | 'ticket_buy' | 'ticket_win';
+  | 'chance_card' | 'community_card';
 
 export interface Transaction {
   id: string;
@@ -85,9 +85,6 @@ interface GameState {
   transfer: (fromId: string | null, toId: string | null, amount: number, type: TransactionType, description: string) => boolean;
   undoLastTransaction: () => void;
   collectSalary: (playerId: string) => void;
-
-  // Ticket actions
-  buyTicket: (playerId: string, ticketPrice: number, ticketLabel: string, prizeMultiplier: number) => void;
 
   // Property actions
   assignProperty: (propertyId: string, ownerId: string | null, price: number) => void;
@@ -242,47 +239,6 @@ export const useGameStore = create<GameState>()(
         transfer(null, playerId, settings.salaryAmount, 'salary', 'Salary — passed Go');
       },
 
-      buyTicket: (playerId, ticketPrice, ticketLabel, prizeMultiplier) => set(state => {
-        const player = state.players.find(p => p.id === playerId);
-        if (!player || player.balance < ticketPrice) return state;
-
-        const winAmount = ticketPrice * prizeMultiplier;
-        const netForPlayer = -ticketPrice + winAmount;
-        const netForBank = ticketPrice - winAmount;
-
-        const newTransactions: Transaction[] = [
-          {
-            id: genId(),
-            type: 'ticket_buy',
-            fromId: playerId,
-            toId: null,
-            amount: ticketPrice,
-            description: `Bought ${ticketLabel}`,
-            timestamp: Date.now(),
-          },
-        ];
-
-        if (winAmount > 0) {
-          newTransactions.push({
-            id: genId(),
-            type: 'ticket_win',
-            fromId: null,
-            toId: playerId,
-            amount: winAmount,
-            description: `${ticketLabel} — ${prizeMultiplier}x prize!`,
-            timestamp: Date.now() + 1,
-          });
-        }
-
-        return {
-          players: state.players.map(p =>
-            p.id === playerId ? { ...p, balance: p.balance + netForPlayer } : p
-          ),
-          bankBalance: state.bankBalance + netForBank,
-          transactions: [...state.transactions, ...newTransactions],
-        };
-      }),
-
       assignProperty: (propertyId, ownerId, price) => set(state => {
         const prev = state.propertyOwnerships[propertyId];
         const prevOwnerId = prev?.ownerId ?? null;
@@ -382,7 +338,7 @@ export const useGameStore = create<GameState>()(
       })),
     }),
     {
-      name: 'monopoly-banker-v2',
+      name: 'monopoly-banker-v3',
       storage: createJSONStorage(() => AsyncStorage),
     }
   )
