@@ -26,7 +26,7 @@ export function PlayerCard({ player, onPress, isSelected, compact = false }: Pro
           backgroundColor: isSelected ? colors.primary + '22' : colors.card,
           borderColor: isSelected ? colors.primary : colors.border,
           borderWidth: isSelected ? 2 : 1,
-          opacity: pressed ? 0.85 : 1,
+          opacity: pressed ? 0.85 : (player.isBankrupt ? 0.6 : 1),
         },
         compact && styles.compact,
       ]}
@@ -35,12 +35,19 @@ export function PlayerCard({ player, onPress, isSelected, compact = false }: Pro
       <View style={styles.content}>
         <PlayerAvatar name={player.name} color={player.color} size={compact ? 36 : 44} />
         <View style={styles.info}>
-          <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>
+          <Text style={[styles.name, { color: player.isBankrupt ? colors.mutedForeground : colors.foreground }]} numberOfLines={1}>
             {player.name}
+            {player.isBankrupt && <Text style={{ color: colors.destructive, fontSize: 12 }}> (Bankrupted)</Text>}
           </Text>
-          <Text style={[styles.balance, { color: colors.primary }]}>
-            {formatMoney(player.balance, currency)}
-          </Text>
+          {player.isBankrupt ? (
+            <Text style={[styles.balance, { color: colors.destructive, fontSize: 16 }]}>
+              BANKRUPTED
+            </Text>
+          ) : (
+            <Text style={[styles.balance, { color: colors.primary }]}>
+              {formatMoney(player.balance, currency)}
+            </Text>
+          )}
         </View>
       </View>
     </Pressable>

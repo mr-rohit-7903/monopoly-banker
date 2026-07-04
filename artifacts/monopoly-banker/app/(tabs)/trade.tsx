@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function TradeScreen() {
   const palette = useColors();
   const insets = useSafeAreaInsets();
-  const players = useGameStore(s => s.players);
+  const players = useGameStore(s => s.players).filter(p => !p.isBankrupt);
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
   const currency = useGameStore(s => s.settings.currency);
   const executeTrade = useGameStore(s => s.executeTrade);

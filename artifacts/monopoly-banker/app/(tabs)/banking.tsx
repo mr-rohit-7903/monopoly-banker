@@ -22,7 +22,7 @@ function pickRandom<T>(arr: T[]): T {
 export default function BankingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const players = useGameStore(s => s.players);
+  const players = useGameStore(s => s.players).filter(p => !p.isBankrupt);
   const settings = useGameStore(s => s.settings);
   const { transfer, collectSalary, payJailFine, useJailCard } = useGameStore();
 
