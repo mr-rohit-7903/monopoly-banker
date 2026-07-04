@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Alert, Platform, Pressable, ScrollView,
+  Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,22 +30,18 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const settings = useGameStore(s => s.settings);
   const { updateSettings, resetGame } = useGameStore();
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
   const [startingMoneyStr, setStartingMoneyStr] = useState(settings.startingMoney.toString());
   const [salaryStr, setSalaryStr] = useState(settings.salaryAmount.toString());
   const [incomeTaxStr, setIncomeTaxStr] = useState(settings.incomeTaxAmount.toString());
   const [luxuryTaxStr, setLuxuryTaxStr] = useState(settings.luxuryTaxAmount.toString());
+  const [showResetModal, setShowResetModal] = useState(false);
 
   function handleReset() {
-    Alert.alert(
-      'Reset Game',
-      'This will remove all players, transactions, and property ownerships. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reset', style: 'destructive', onPress: () => { resetGame(); router.back(); } },
-      ]
-    );
+    resetGame();
+    setShowResetModal(false);
+    router.back();
   }
 
   const DARK_MODES: { value: DarkMode; label: string }[] = [
@@ -77,6 +73,48 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
+      {/* ── Reset Game confirmation modal ── */}
+      <Modal
+        visible={showResetModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowResetModal(false)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setShowResetModal(false)}>
+          <Pressable style={[styles.modalCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+            <View style={styles.modalBody}>
+              <MaterialCommunityIcons name="restart" size={32} color={palette.destructive} />
+              <Text style={[styles.modalTitle, { color: palette.foreground }]}>
+                Reset Game?
+              </Text>
+              <Text style={[styles.modalSub, { color: palette.mutedForeground }]}>
+                This will remove all players, transactions, and property ownerships. This cannot be undone.
+              </Text>
+              <View style={styles.modalBtns}>
+                <Pressable
+                  onPress={() => setShowResetModal(false)}
+                  style={({ pressed }) => [
+                    styles.modalCancel,
+                    { borderColor: palette.border, opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Text style={[styles.modalCancelText, { color: palette.foreground }]}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleReset}
+                  style={({ pressed }) => [
+                    styles.modalConfirm,
+                    { backgroundColor: palette.destructive, opacity: pressed ? 0.8 : 1 },
+                  ]}
+                >
+                  <Text style={styles.modalConfirmText}>Reset</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: palette.background, borderBottomColor: palette.border }]}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={palette.foreground} />
@@ -165,7 +203,7 @@ export default function SettingsScreen() {
         <Text style={[styles.groupLabel, { color: palette.mutedForeground }]}>Danger Zone</Text>
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
           <Pressable
-            onPress={handleReset}
+            onPress={() => setShowResetModal(true)}
             style={({ pressed }) => [styles.dangerRow, { opacity: pressed ? 0.7 : 1 }]}
           >
             <MaterialCommunityIcons name="restart" size={20} color={palette.destructive} />
@@ -210,4 +248,21 @@ const styles = StyleSheet.create({
   dangerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
   dangerText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
   version: { fontFamily: 'Inter_400Regular', fontSize: 12, textAlign: 'center', marginTop: 10 },
+  // Reset modal
+  overlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center', padding: 24,
+  },
+  modalCard: { width: '100%', borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+  modalBody: { padding: 24, alignItems: 'center', gap: 12 },
+  modalTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, textAlign: 'center' },
+  modalSub: { fontFamily: 'Inter_400Regular', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  modalBtns: { flexDirection: 'row', gap: 12, marginTop: 8, width: '100%' },
+  modalCancel: {
+    flex: 1, paddingVertical: 14, borderRadius: 12,
+    borderWidth: 1.5, alignItems: 'center',
+  },
+  modalCancelText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+  modalConfirm: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  modalConfirmText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#fff' },
 });

@@ -147,7 +147,7 @@ export default function PropertiesScreen() {
   const players = useGameStore(s => s.players);
   const currency = useGameStore(s => s.settings.currency);
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

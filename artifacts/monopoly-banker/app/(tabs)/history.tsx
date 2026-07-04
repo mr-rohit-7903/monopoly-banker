@@ -18,7 +18,7 @@ export default function HistoryScreen() {
   const undoLastTransaction = useGameStore(s => s.undoLastTransaction);
   const [search, setSearch] = useState('');
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
   const reversed = [...transactions].reverse();
   const filtered = reversed.filter(t => {

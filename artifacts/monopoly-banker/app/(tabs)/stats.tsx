@@ -19,7 +19,7 @@ export default function StatsScreen() {
   const currency = useGameStore(s => s.settings.currency);
   const gameStartTime = useGameStore(s => s.gameStartTime);
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
   const totalInCirculation = players.reduce((sum, p) => sum + p.balance, 0);
   const richest = players.length > 0

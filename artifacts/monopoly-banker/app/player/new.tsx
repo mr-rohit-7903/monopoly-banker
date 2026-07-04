@@ -41,7 +41,7 @@ export default function NewPlayerScreen() {
     router.back();
   }
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>

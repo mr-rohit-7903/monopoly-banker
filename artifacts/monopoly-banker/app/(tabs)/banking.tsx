@@ -47,7 +47,7 @@ export default function BankingScreen() {
   const [cardDrawerId, setCardDrawerId] = useState<string | null>(null);
   const [drawnCard, setDrawnCard] = useState<MonopolyCard | null>(null);
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
   // ── Transfer ─────────────────────────────────────────────────────────────
   function handleTransfer() {

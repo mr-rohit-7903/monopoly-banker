@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import {
-  Modal, Platform, Pressable, ScrollView,
+  Platform, Pressable, ScrollView,
   StyleSheet, Text, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { useGameStore, Player } from '@/store/gameStore';
+import { useGameStore } from '@/store/gameStore';
 import { PlayerCard } from '@/components/PlayerCard';
 import { DiceRoller } from '@/components/DiceRoller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,69 +20,14 @@ export default function PlayersScreen() {
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players);
   const transactions = useGameStore(s => s.transactions);
-  const removePlayer = useGameStore(s => s.removePlayer);
   const [diceVisible, setDiceVisible] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Player | null>(null);
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 16 : insets.top;
   const canAddPlayer = players.length < MAX_PLAYERS && transactions.length === 0;
-
-  function confirmDelete() {
-    if (!deleteTarget) return;
-    removePlayer(deleteTarget.id);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setDeleteTarget(null);
-  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <DiceRoller visible={diceVisible} onClose={() => setDiceVisible(false)} />
-
-      {/* ── Delete confirmation modal ── */}
-      <Modal
-        visible={!!deleteTarget}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeleteTarget(null)}
-      >
-        <Pressable style={styles.overlay} onPress={() => setDeleteTarget(null)}>
-          <Pressable style={[styles.deleteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Colour strip */}
-            {deleteTarget && (
-              <View style={[styles.deleteStrip, { backgroundColor: deleteTarget.color }]} />
-            )}
-            <View style={styles.deleteBody}>
-              <MaterialCommunityIcons name="account-remove" size={32} color={colors.destructive} />
-              <Text style={[styles.deleteTitle, { color: colors.foreground }]}>
-                Remove {deleteTarget?.name}?
-              </Text>
-              <Text style={[styles.deleteSub, { color: colors.mutedForeground }]}>
-                This will remove the player and release all their properties back to the bank.
-              </Text>
-              <View style={styles.deleteBtns}>
-                <Pressable
-                  onPress={() => setDeleteTarget(null)}
-                  style={({ pressed }) => [
-                    styles.deleteCancel,
-                    { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-                  ]}
-                >
-                  <Text style={[styles.deleteCancelText, { color: colors.foreground }]}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={confirmDelete}
-                  style={({ pressed }) => [
-                    styles.deleteConfirm,
-                    { backgroundColor: colors.destructive, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                >
-                  <Text style={styles.deleteConfirmText}>Remove</Text>
-                </Pressable>
-              </View>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -122,12 +67,12 @@ export default function PlayersScreen() {
           </View>
         ) : (
           <View>
-            <Text style={[styles.hint, { color: colors.mutedForeground }]}>Tap a player to remove them</Text>
+            <Text style={[styles.hint, { color: colors.mutedForeground }]}>Tap a player to view details</Text>
             {players.map(player => (
               <PlayerCard
                 key={player.id}
                 player={player}
-                onPress={() => setDeleteTarget(player)}
+                onPress={() => router.push(`/player/${player.id}`)}
               />
             ))}
           </View>
@@ -176,34 +121,6 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTitle: { fontFamily: 'Inter_700Bold', fontSize: 20 },
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 15, textAlign: 'center' },
-  // Delete modal
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  deleteCard: {
-    width: '100%',
-    borderRadius: 20,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  deleteStrip: { height: 6 },
-  deleteBody: { padding: 24, alignItems: 'center', gap: 12 },
-  deleteTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, textAlign: 'center' },
-  deleteSub: { fontFamily: 'Inter_400Regular', fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  deleteBtns: { flexDirection: 'row', gap: 12, marginTop: 8, width: '100%' },
-  deleteCancel: {
-    flex: 1, paddingVertical: 14, borderRadius: 12,
-    borderWidth: 1.5, alignItems: 'center',
-  },
-  deleteCancelText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
-  deleteConfirm: {
-    flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center',
-  },
-  deleteConfirmText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#fff' },
   // FAB
   fab: {
     position: 'absolute',
