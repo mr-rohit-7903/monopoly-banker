@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
-  Alert, Modal, Platform, Pressable, ScrollView,
+  Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { useGameStore } from '@/store/gameStore';
+import { useGameStore, Player } from '@/store/gameStore';
 import { MONOPOLY_PROPERTIES, PROPERTY_GROUPS, GROUP_NAMES, MonopolyProperty, GROUP_COLORS } from '@/constants/monopoly';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { formatMoney } from '@/utils/format';
@@ -21,12 +21,27 @@ function PropertyDetailModal({
   const currency = useGameStore(s => s.settings.currency);
   const { assignProperty, setHouses, toggleMortgage } = useGameStore();
 
+  // Buy confirmation state
+  const [buyTarget, setBuyTarget] = useState<Player | null>(null);
+
   if (!property || !ownership) return null;
   const owner = ownership.ownerId ? players.find(p => p.id === ownership.ownerId) : null;
 
+  function handleConfirmBuy() {
+    if (!buyTarget || !property) return;
+    assignProperty(property.id, buyTarget.id, property.price);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setBuyTarget(null);
+  }
+
+  function handleClose() {
+    setBuyTarget(null);
+    onClose();
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <Pressable style={styles.overlay} onPress={handleClose}>
         <Pressable style={[styles.detailModal, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.detailStrip, { backgroundColor: property.groupColor }]} />
           <ScrollView contentContainerStyle={styles.detailContent}>
@@ -35,32 +50,102 @@ function PropertyDetailModal({
               {formatMoney(property.price, currency)} · Mortgage: {formatMoney(property.mortgage, currency)}
             </Text>
 
-            {/* Owner */}
+            {/* Owner section */}
             <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Owner</Text>
-            {players.length === 0 ? (
+
+            {owner ? (
+              /* ── Property is owned — show owner, no reassignment ── */
+              <View style={styles.ownedSection}>
+                <View style={[styles.ownerDisplay, { backgroundColor: owner.color + '15', borderColor: owner.color }]}>
+                  <PlayerAvatar name={owner.name} color={owner.color} size={32} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.ownerDisplayName, { color: colors.foreground }]}>{owner.name}</Text>
+                    <Text style={[styles.ownerDisplayBalance, { color: colors.mutedForeground }]}>
+                      {formatMoney(owner.balance, currency)}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons name="lock" size={16} color={colors.mutedForeground} />
+                </View>
+                <View style={[styles.tradeHint, { backgroundColor: colors.muted }]}>
+                  <MaterialCommunityIcons name="swap-horizontal" size={16} color={colors.primary} />
+                  <Text style={[styles.tradeHintText, { color: colors.mutedForeground }]}>
+                    Use the <Text style={{ color: colors.primary, fontFamily: 'Inter_700Bold' }}>Trade</Text> tab to transfer properties between players
+                  </Text>
+                </View>
+              </View>
+            ) : players.length === 0 ? (
               <Text style={[styles.detailPrice, { color: colors.mutedForeground }]}>No players in game yet</Text>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownerRow}>
-                {!owner && (
-                  <View style={[styles.ownerChip, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                    <Text style={[styles.ownerChipText, { color: colors.mutedForeground }]}>Unowned</Text>
+              /* ── Property is unowned — show buy buttons ── */
+              <>
+                {/* Buy confirmation inline */}
+                {buyTarget ? (
+                  <View style={[styles.confirmCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <View style={styles.confirmHeader}>
+                      <PlayerAvatar name={buyTarget.name} color={buyTarget.color} size={28} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.confirmText, { color: colors.foreground }]}>
+                          {buyTarget.name} buys {property.name}?
+                        </Text>
+                        <Text style={[styles.confirmSub, { color: colors.mutedForeground }]}>
+                          {formatMoney(property.price, currency)} will be deducted from their balance
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.confirmBtns}>
+                      <Pressable
+                        onPress={() => setBuyTarget(null)}
+                        style={({ pressed }) => [
+                          styles.confirmCancel,
+                          { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+                        ]}
+                      >
+                        <Text style={[styles.confirmCancelText, { color: colors.foreground }]}>Cancel</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={handleConfirmBuy}
+                        style={({ pressed }) => [
+                          styles.confirmBuy,
+                          { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 },
+                        ]}
+                      >
+                        <Text style={styles.confirmBuyText}>Buy {formatMoney(property.price, currency)}</Text>
+                      </Pressable>
+                    </View>
                   </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownerRow}>
+                    {players.map(p => {
+                      const canAfford = p.balance >= property.price;
+                      return (
+                        <Pressable
+                          key={p.id}
+                          onPress={() => {
+                            if (!canAfford) return;
+                            setBuyTarget(p);
+                          }}
+                          style={[
+                            styles.buyChip,
+                            {
+                              backgroundColor: colors.muted,
+                              borderColor: canAfford ? colors.border : colors.destructive + '44',
+                              opacity: canAfford ? 1 : 0.5,
+                            },
+                          ]}
+                        >
+                          <PlayerAvatar name={p.name} color={p.color} size={22} />
+                          <View>
+                            <Text style={[styles.buyChipName, { color: colors.foreground }]}>{p.name}</Text>
+                            <Text style={[styles.buyChipBalance, { color: canAfford ? colors.mutedForeground : colors.destructive }]}>
+                              {formatMoney(p.balance, currency)}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
                 )}
-                {players.map(p => (
-                  <Pressable
-                    key={p.id}
-                    onPress={() => {
-                      if (owner?.id === p.id) return; // already owned by this player
-                      assignProperty(property.id, p.id, ownership.ownerId ? 0 : property.price);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    style={[styles.ownerChip, { backgroundColor: owner?.id === p.id ? p.color + '22' : colors.muted, borderColor: owner?.id === p.id ? p.color : colors.border }]}
-                  >
-                    <PlayerAvatar name={p.name} color={p.color} size={22} />
-                    <Text style={[styles.ownerChipText, { color: owner?.id === p.id ? p.color : colors.foreground }]}>{p.name}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+              </>
             )}
 
             {/* Houses/Hotels for properties */}
@@ -252,9 +337,43 @@ const styles = StyleSheet.create({
   detailName: { fontFamily: 'Inter_700Bold', fontSize: 22 },
   detailPrice: { fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: -8 },
   detailLabel: { fontFamily: 'Inter_500Medium', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  // Owned property display
+  ownedSection: { gap: 10 },
+  ownerDisplay: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 14, borderRadius: 14, borderWidth: 1.5,
+  },
+  ownerDisplayName: { fontFamily: 'Inter_700Bold', fontSize: 16 },
+  ownerDisplayBalance: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  tradeHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    padding: 12, borderRadius: 10,
+  },
+  tradeHintText: { fontFamily: 'Inter_400Regular', fontSize: 12, flex: 1, lineHeight: 17 },
+  // Unowned — buy chips
   ownerRow: { flexDirection: 'row', gap: 8 },
-  ownerChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5 },
-  ownerChipText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  buyChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5,
+  },
+  buyChipName: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  buyChipBalance: { fontFamily: 'Inter_400Regular', fontSize: 11 },
+  // Buy confirmation
+  confirmCard: {
+    borderRadius: 14, borderWidth: 1, padding: 16, gap: 14,
+  },
+  confirmHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  confirmText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
+  confirmSub: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, marginTop: 2 },
+  confirmBtns: { flexDirection: 'row', gap: 10 },
+  confirmCancel: {
+    flex: 1, paddingVertical: 12, borderRadius: 10,
+    borderWidth: 1.5, alignItems: 'center',
+  },
+  confirmCancelText: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
+  confirmBuy: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  confirmBuyText: { fontFamily: 'Inter_700Bold', fontSize: 15, color: '#fff' },
+  // Houses
   housesRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   houseBtn: { width: 44, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   hotelBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 44, borderRadius: 10, borderWidth: 1.5 },
