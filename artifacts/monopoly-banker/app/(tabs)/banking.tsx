@@ -36,6 +36,13 @@ export default function BankingScreen() {
   // Jail modal state
   const [jailVisible, setJailVisible] = useState(false);
 
+  // Transaction success confirmation
+  const [txConfirm, setTxConfirm] = useState<{ emoji: string; title: string; sub: string } | null>(null);
+
+  function showConfirm(emoji: string, title: string, sub: string) {
+    setTxConfirm({ emoji, title, sub });
+  }
+
   // Card draw state
   const [cardDrawerId, setCardDrawerId] = useState<string | null>(null);
   const [drawnCard, setDrawnCard] = useState<MonopolyCard | null>(null);
@@ -53,6 +60,7 @@ export default function BankingScreen() {
     if (ok) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setAmount('');
+      showConfirm('✅', 'Transfer Complete', `${formatMoney(amt, settings.currency)} from ${fromName} to ${toName}`);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Insufficient funds', 'The sender does not have enough money.');
@@ -62,9 +70,11 @@ export default function BankingScreen() {
   // ── Quick actions ─────────────────────────────────────────────────────────
   function handleQuick(action: 'salary' | 'income' | 'luxury') {
     if (!quickPlayerId) { Alert.alert('Select a player first'); return; }
+    const playerName = players.find(p => p.id === quickPlayerId)?.name ?? 'Player';
     if (action === 'salary') {
       collectSalary(quickPlayerId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showConfirm('🏁', 'Salary Collected', `${playerName} received ${formatMoney(settings.salaryAmount, settings.currency)} from the bank`);
     } else {
       const amt  = action === 'income' ? settings.incomeTaxAmount : settings.luxuryTaxAmount;
       const type = action === 'income' ? 'income_tax' : ('luxury_tax' as const);
@@ -72,6 +82,7 @@ export default function BankingScreen() {
       const ok = transfer(quickPlayerId, null, amt, type, label);
       if (ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showConfirm('💸', `${label} Paid`, `${playerName} paid ${formatMoney(amt, settings.currency)} to the bank`);
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Insufficient funds');
@@ -103,6 +114,23 @@ export default function BankingScreen() {
         onClose={() => setDrawnCard(null)}
       />
 
+      {/* ── Transaction success popup ── */}
+      <Modal visible={!!txConfirm} transparent animationType="fade" onRequestClose={() => setTxConfirm(null)}>
+        <Pressable style={confirmStyles.overlay} onPress={() => setTxConfirm(null)}>
+          <Pressable style={[confirmStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={confirmStyles.emoji}>{txConfirm?.emoji}</Text>
+            <Text style={[confirmStyles.title, { color: colors.foreground }]}>{txConfirm?.title}</Text>
+            <Text style={[confirmStyles.sub, { color: colors.mutedForeground }]}>{txConfirm?.sub}</Text>
+            <Pressable
+              onPress={() => setTxConfirm(null)}
+              style={({ pressed }) => [confirmStyles.okBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+            >
+              <Text style={[confirmStyles.okText, { color: colors.primaryForeground }]}>Done</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ── Jail modal ── */}
       {(() => {
         const jailPlayer = players.find(p => p.id === quickPlayerId);
@@ -131,6 +159,7 @@ export default function BankingScreen() {
                       if (ok) {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                         setJailVisible(false);
+                        showConfirm('🔓', 'Released from Jail', `${jailPlayer.name} paid ${formatMoney(50, settings.currency)} fine`);
                       } else {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                         Alert.alert('Insufficient funds', `${jailPlayer.name} cannot afford the $50 fine.`);
@@ -156,6 +185,7 @@ export default function BankingScreen() {
                       if (ok) {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                         setJailVisible(false);
+                        showConfirm('🆓', 'Released from Jail', `${jailPlayer.name} used their Get Out of Jail Free card`);
                       }
                     }}
                     style={({ pressed }) => [
@@ -363,6 +393,19 @@ export default function BankingScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const confirmStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  card: {
+    width: '100%', borderRadius: 20, borderWidth: 1,
+    padding: 28, alignItems: 'center', gap: 10,
+  },
+  emoji: { fontSize: 48 },
+  title: { fontFamily: 'Inter_700Bold', fontSize: 20, textAlign: 'center' },
+  sub: { fontFamily: 'Inter_400Regular', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  okBtn: { marginTop: 8, paddingHorizontal: 40, paddingVertical: 13, borderRadius: 14 },
+  okText: { fontFamily: 'Inter_700Bold', fontSize: 16 },
+});
 
 const jailStyles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
