@@ -19,6 +19,7 @@ export interface MonopolyCard {
   houseAmount?: number;   // for repairs
   hotelAmount?: number;   // for repairs
   hasGoBonus?: boolean;   // movement cards where passing GO is possible
+  isGoojf?: boolean;      // Get Out of Jail Free — grants player a jail card
 }
 
 export const CHANCE_CARDS: MonopolyCard[] = [
@@ -106,6 +107,7 @@ export const CHANCE_CARDS: MonopolyCard[] = [
     title: 'Get Out of Jail Free',
     description: 'Keep this card until you need it, then discard it. You may sell this card to another player.',
     action: 'display',
+    isGoojf: true,
   },
   {
     id: 'ch_goback3',
@@ -206,6 +208,7 @@ export const COMMUNITY_CHEST_CARDS: MonopolyCard[] = [
     title: 'Get Out of Jail Free',
     description: 'Keep this card until you need it, then discard it. You may sell this card to another player.',
     action: 'display',
+    isGoojf: true,
   },
   {
     id: 'cc_jail',

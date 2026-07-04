@@ -47,10 +47,6 @@ export default function StatsScreen() {
   const ownedProperties = Object.values(propertyOwnerships).filter(o => o.ownerId !== null).length;
   const mortgagedProperties = Object.values(propertyOwnerships).filter(o => o.isMortgaged).length;
 
-  // Card draw stats
-  const chanceDraws = transactions.filter(t => t.type === 'chance_card').length;
-  const communityDraws = transactions.filter(t => t.type === 'community_card').length;
-  const totalCardDraws = chanceDraws + communityDraws;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -106,39 +102,19 @@ export default function StatsScreen() {
 
             <View style={styles.grid}>
               <StatCard
-                label="Cards Drawn"
-                value={totalCardDraws.toString()}
-                icon="cards"
-                accent
-              />
-              <StatCard
                 label="Game Duration"
                 value={formatDuration(gameDuration)}
                 icon="timer"
               />
-            </View>
-
-            {totalCardDraws > 0 && (
-              <View style={styles.grid}>
-                <StatCard
-                  label="Chance Draws"
-                  value={chanceDraws.toString()}
-                  icon="cards-playing-outline"
-                />
-                <StatCard
-                  label="Community Chest"
-                  value={communityDraws.toString()}
-                  icon="cards-playing"
-                />
-              </View>
-            )}
-
-            <View style={styles.grid}>
               <StatCard
                 label="Transactions"
                 value={totalTransactions.toString()}
                 icon="swap-horizontal"
+                accent
               />
+            </View>
+
+            <View style={styles.grid}>
               <StatCard
                 label="Properties Sold"
                 value={`${ownedProperties} / ${MONOPOLY_PROPERTIES.length}`}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Alert, FlatList, Platform, Pressable,
+  FlatList, Platform, Pressable,
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -34,21 +34,8 @@ export default function HistoryScreen() {
   });
 
   function handleUndo() {
-    Alert.alert(
-      'Undo Last Transaction',
-      'This will reverse the most recent transaction. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Undo',
-          style: 'destructive',
-          onPress: () => {
-            undoLastTransaction();
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          },
-        },
-      ]
-    );
+    undoLastTransaction();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   return (

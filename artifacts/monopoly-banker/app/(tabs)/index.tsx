@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Platform, Pressable, ScrollView,
+  Alert, Platform, Pressable, ScrollView,
   StyleSheet, Text, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,18 +10,50 @@ import { useColors } from '@/hooks/useColors';
 import { useGameStore } from '@/store/gameStore';
 import { PlayerCard } from '@/components/PlayerCard';
 import { DiceRoller } from '@/components/DiceRoller';
-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const MAX_PLAYERS = 5;
 
 export default function PlayersScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players);
-  const currency = useGameStore(s => s.settings.currency);
+  const transactions = useGameStore(s => s.transactions);
+  const removePlayer = useGameStore(s => s.removePlayer);
   const [diceVisible, setDiceVisible] = useState(false);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
+
+  // Hide "Add Player" once the game has started (any transaction) or limit reached
+  const canAddPlayer = players.length < MAX_PLAYERS && transactions.length === 0;
+
+  function handlePlayerPress(id: string, name: string) {
+    Alert.alert(
+      name,
+      'What would you like to do?',
+      [
+        {
+          text: 'Remove Player',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(`Remove ${name}?`, 'This will remove the player and all their properties.', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Remove',
+                style: 'destructive',
+                onPress: () => {
+                  removePlayer(id);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                },
+              },
+            ]);
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -32,7 +64,7 @@ export default function PlayersScreen() {
         <View>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Players</Text>
           <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
-            {players.length} {players.length === 1 ? 'player' : 'players'}
+            {players.length} / {MAX_PLAYERS} players
           </Text>
         </View>
         <View style={styles.headerActions}>
@@ -55,22 +87,12 @@ export default function PlayersScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Bank card */}
-        <View style={[styles.bankCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <MaterialCommunityIcons name="bank" size={22} color={colors.primary} />
-          <View>
-            <Text style={[styles.bankLabel, { color: colors.mutedForeground }]}>Bank</Text>
-            <Text style={[styles.bankAmount, { color: colors.foreground }]}>Unlimited</Text>
-          </View>
-        </View>
-
-        {/* Players list */}
         {players.length === 0 ? (
           <View style={styles.empty}>
             <MaterialCommunityIcons name="account-group" size={56} color={colors.border} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No players yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              Add players to start your game
+              Add up to {MAX_PLAYERS} players to start
             </Text>
           </View>
         ) : (
@@ -79,31 +101,33 @@ export default function PlayersScreen() {
               <PlayerCard
                 key={player.id}
                 player={player}
-                onPress={() => router.push(`/player/${player.id}`)}
+                onPress={() => handlePlayerPress(player.id, player.name)}
               />
             ))}
           </View>
         )}
       </ScrollView>
 
-      {/* FAB */}
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.push('/player/new');
-        }}
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            backgroundColor: colors.primary,
-            bottom: insets.bottom + (Platform.OS === 'web' ? 84 : 80),
-            opacity: pressed ? 0.85 : 1,
-          },
-        ]}
-      >
-        <MaterialCommunityIcons name="account-plus" size={24} color={colors.primaryForeground} />
-        <Text style={[styles.fabText, { color: colors.primaryForeground }]}>Add Player</Text>
-      </Pressable>
+      {/* FAB — hidden once game starts or at player limit */}
+      {canAddPlayer && (
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/player/new');
+          }}
+          style={({ pressed }) => [
+            styles.fab,
+            {
+              backgroundColor: colors.primary,
+              bottom: insets.bottom + (Platform.OS === 'web' ? 84 : 80),
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="account-plus" size={24} color={colors.primaryForeground} />
+          <Text style={[styles.fabText, { color: colors.primaryForeground }]}>Add Player</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -123,12 +147,6 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', gap: 10 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: 16, gap: 16 },
-  bankCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    padding: 16, borderRadius: 14, borderWidth: 1,
-  },
-  bankLabel: { fontFamily: 'Inter_400Regular', fontSize: 13 },
-  bankAmount: { fontFamily: 'Inter_700Bold', fontSize: 22 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTitle: { fontFamily: 'Inter_700Bold', fontSize: 20 },
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 15, textAlign: 'center' },

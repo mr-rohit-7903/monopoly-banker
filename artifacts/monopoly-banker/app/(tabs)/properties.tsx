@@ -141,7 +141,6 @@ export default function PropertiesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [selectedProperty, setSelectedProperty] = useState<MonopolyProperty | null>(null);
-  const [filterGroup, setFilterGroup] = useState<string | null>(null);
 
   // Subscribe to store so the grid re-renders on ownership changes
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
@@ -149,10 +148,6 @@ export default function PropertiesScreen() {
   const currency = useGameStore(s => s.settings.currency);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-
-  const filteredGroups = filterGroup
-    ? PROPERTY_GROUPS.filter(g => g === filterGroup)
-    : PROPERTY_GROUPS;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -166,36 +161,11 @@ export default function PropertiesScreen() {
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Properties</Text>
       </View>
 
-      {/* Group filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-        style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
-      >
-        <Pressable
-          onPress={() => setFilterGroup(null)}
-          style={[styles.filterChip, { backgroundColor: !filterGroup ? colors.primary : colors.muted, borderColor: colors.border }]}
-        >
-          <Text style={[styles.filterText, { color: !filterGroup ? colors.primaryForeground : colors.foreground }]}>All</Text>
-        </Pressable>
-        {PROPERTY_GROUPS.map(g => (
-          <Pressable
-            key={g}
-            onPress={() => setFilterGroup(filterGroup === g ? null : g)}
-            style={[styles.filterChip, { backgroundColor: filterGroup === g ? GROUP_COLORS[g] + '33' : colors.muted, borderColor: filterGroup === g ? GROUP_COLORS[g] : colors.border }]}
-          >
-            <View style={[styles.filterDot, { backgroundColor: GROUP_COLORS[g] }]} />
-            <Text style={[styles.filterText, { color: filterGroup === g ? GROUP_COLORS[g] : colors.foreground }]}>{GROUP_NAMES[g]}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false}
       >
-        {filteredGroups.map(group => {
+        {PROPERTY_GROUPS.map(group => {
           const props = MONOPOLY_PROPERTIES.filter(p => p.group === group);
           return (
             <View key={group} style={styles.groupSection}>
@@ -258,10 +228,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 28 },
-  filterRow: { flexDirection: 'row', gap: 8, padding: 12 },
-  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  filterDot: { width: 10, height: 10, borderRadius: 5 },
-  filterText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
   scroll: { padding: 14, gap: 20 },
   groupSection: { gap: 10 },
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },

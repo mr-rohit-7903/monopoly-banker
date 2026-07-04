@@ -24,7 +24,7 @@ export function CardDrawModal({ card, drawerId, onClose }: Props) {
   const players = useGameStore(s => s.players);
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
   const currency = useGameStore(s => s.settings.currency);
-  const { transfer } = useGameStore();
+  const { transfer, addJailCard } = useGameStore();
   const [passedGo, setPassedGo] = useState(false);
 
   if (!card || !drawerId) return null;
@@ -97,6 +97,11 @@ export function CardDrawModal({ card, drawerId, onClose }: Props) {
   function handleDone() {
     if (passedGo) {
       transfer(null, drawerId, 200, 'salary', 'Passed GO');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    // GOOJF card: grant the drawing player a jail card
+    if (safeCard.isGoojf) {
+      addJailCard(safeDrawerId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     setPassedGo(false);

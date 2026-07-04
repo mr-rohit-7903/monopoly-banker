@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Alert, KeyboardAvoidingView, Platform, Pressable,
+  Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -23,7 +23,7 @@ export default function BankingScreen() {
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players);
   const settings = useGameStore(s => s.settings);
-  const { transfer, collectSalary } = useGameStore();
+  const { transfer, collectSalary, payJailFine, useJailCard } = useGameStore();
 
   // Transfer state
   const [fromId, setFromId] = useState<string | null>(null);
@@ -32,6 +32,9 @@ export default function BankingScreen() {
 
   // Quick actions player
   const [quickPlayerId, setQuickPlayerId] = useState<string | null>(null);
+
+  // Jail modal state
+  const [jailVisible, setJailVisible] = useState(false);
 
   // Card draw state
   const [cardDrawerId, setCardDrawerId] = useState<string | null>(null);
@@ -76,6 +79,11 @@ export default function BankingScreen() {
     }
   }
 
+  function handleJail() {
+    if (!quickPlayerId) { Alert.alert('Select a player first'); return; }
+    setJailVisible(true);
+  }
+
   // ── Card draw ─────────────────────────────────────────────────────────────
   function handleDraw(deck: 'chance' | 'community') {
     if (!cardDrawerId) { Alert.alert('Select a player first', 'Tap a player above then draw a card'); return; }
@@ -94,6 +102,92 @@ export default function BankingScreen() {
         drawerId={cardDrawerId}
         onClose={() => setDrawnCard(null)}
       />
+
+      {/* ── Jail modal ── */}
+      {(() => {
+        const jailPlayer = players.find(p => p.id === quickPlayerId);
+        if (!jailPlayer) return null;
+        return (
+          <Modal visible={jailVisible} transparent animationType="slide" onRequestClose={() => setJailVisible(false)}>
+            <Pressable style={jailStyles.overlay} onPress={() => setJailVisible(false)}>
+              <Pressable style={[jailStyles.sheet, { backgroundColor: colors.card }]}>
+                <View style={[jailStyles.banner, { backgroundColor: '#5C4033' }]}>
+                  <Text style={jailStyles.bannerEmoji}>🔒</Text>
+                  <View>
+                    <Text style={jailStyles.bannerLabel}>In Jail</Text>
+                    <Text style={jailStyles.bannerPlayer}>{jailPlayer.name}</Text>
+                  </View>
+                </View>
+
+                <View style={jailStyles.body}>
+                  <Text style={[jailStyles.hint, { color: colors.mutedForeground }]}>
+                    Choose how {jailPlayer.name} gets out of jail:
+                  </Text>
+
+                  {/* Pay fine */}
+                  <Pressable
+                    onPress={() => {
+                      const ok = payJailFine(jailPlayer.id);
+                      if (ok) {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        setJailVisible(false);
+                      } else {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                        Alert.alert('Insufficient funds', `${jailPlayer.name} cannot afford the $50 fine.`);
+                      }
+                    }}
+                    style={({ pressed }) => [
+                      jailStyles.optionBtn,
+                      { backgroundColor: colors.destructive + '18', borderColor: colors.destructive + '55', opacity: pressed ? 0.8 : 1 },
+                    ]}
+                  >
+                    <MaterialCommunityIcons name="cash-minus" size={24} color={colors.destructive} />
+                    <View style={jailStyles.optionText}>
+                      <Text style={[jailStyles.optionLabel, { color: colors.foreground }]}>Pay Fine</Text>
+                      <Text style={[jailStyles.optionSub, { color: colors.destructive }]}>-{formatMoney(50, settings.currency)}</Text>
+                    </View>
+                  </Pressable>
+
+                  {/* Use jail card */}
+                  <Pressable
+                    disabled={jailPlayer.jailCards === 0}
+                    onPress={() => {
+                      const ok = useJailCard(jailPlayer.id);
+                      if (ok) {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        setJailVisible(false);
+                      }
+                    }}
+                    style={({ pressed }) => [
+                      jailStyles.optionBtn,
+                      {
+                        backgroundColor: jailPlayer.jailCards > 0 ? colors.success + '18' : colors.muted,
+                        borderColor: jailPlayer.jailCards > 0 ? colors.success + '55' : colors.border,
+                        opacity: pressed ? 0.8 : jailPlayer.jailCards === 0 ? 0.45 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 24 }}>🆓</Text>
+                    <View style={jailStyles.optionText}>
+                      <Text style={[jailStyles.optionLabel, { color: colors.foreground }]}>Use Jail Card</Text>
+                      <Text style={[jailStyles.optionSub, { color: jailPlayer.jailCards > 0 ? colors.success : colors.mutedForeground }]}>
+                        {jailPlayer.jailCards} card{jailPlayer.jailCards !== 1 ? 's' : ''} held
+                      </Text>
+                    </View>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => setJailVisible(false)}
+                    style={({ pressed }) => [jailStyles.cancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Text style={[jailStyles.cancelText, { color: colors.foreground }]}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        );
+      })()}
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -171,6 +265,18 @@ export default function BankingScreen() {
                 <Text style={[styles.quickCardSub, { color: item.color }]}>{item.sub}</Text>
               </Pressable>
             ))}
+            {/* Jail */}
+            <Pressable
+              onPress={handleJail}
+              style={({ pressed }) => [
+                styles.quickCard,
+                { backgroundColor: '#5C4033' + '22', borderColor: '#5C4033' + '55', opacity: pressed ? 0.8 : 1 },
+              ]}
+            >
+              <MaterialCommunityIcons name="lock" size={22} color="#8B6550" />
+              <Text style={[styles.quickCardLabel, { color: colors.foreground }]}>Jail</Text>
+              <Text style={[styles.quickCardSub, { color: '#8B6550' }]}>Pay or card</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -257,6 +363,23 @@ export default function BankingScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const jailStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, paddingVertical: 20 },
+  bannerEmoji: { fontSize: 36 },
+  bannerLabel: { fontFamily: 'Inter_700Bold', fontSize: 12, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 },
+  bannerPlayer: { fontFamily: 'Inter_700Bold', fontSize: 20, color: '#fff', marginTop: 2 },
+  body: { padding: 20, gap: 12 },
+  hint: { fontFamily: 'Inter_400Regular', fontSize: 14, marginBottom: 4 },
+  optionBtn: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 16, borderRadius: 14, borderWidth: 1.5 },
+  optionText: { flex: 1 },
+  optionLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+  optionSub: { fontFamily: 'Inter_700Bold', fontSize: 15, marginTop: 2 },
+  cancelBtn: { paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', marginTop: 4 },
+  cancelText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

@@ -12,6 +12,7 @@ export interface Player {
   name: string;
   color: string;
   balance: number;
+  jailCards: number; // Get Out of Jail Free cards held
 }
 
 export type TransactionType =
@@ -19,7 +20,8 @@ export type TransactionType =
   | 'salary' | 'income_tax' | 'luxury_tax'
   | 'mortgage' | 'unmortgage'
   | 'property_buy' | 'property_sell'
-  | 'chance_card' | 'community_card';
+  | 'chance_card' | 'community_card'
+  | 'jail_fine' | 'jail_card';
 
 export interface Transaction {
   id: string;
@@ -79,11 +81,14 @@ interface GameState {
   addPlayer: (name: string, color: string) => void;
   removePlayer: (id: string) => void;
   updatePlayer: (id: string, updates: { name?: string; color?: string }) => void;
+  addJailCard: (playerId: string) => void;
+  useJailCard: (playerId: string) => boolean;
 
   // Banking actions
   transfer: (fromId: string | null, toId: string | null, amount: number, type: TransactionType, description: string) => boolean;
   undoLastTransaction: () => void;
   collectSalary: (playerId: string) => void;
+  payJailFine: (playerId: string) => boolean;
 
   // Property actions
   assignProperty: (propertyId: string, ownerId: string | null, price: number) => void;
@@ -110,6 +115,7 @@ export const useGameStore = create<GameState>()(
           name: name.trim(),
           color,
           balance: state.settings.startingMoney,
+          jailCards: 0,
         }],
         transactions: [...state.transactions, {
           id: genId(),
@@ -138,6 +144,28 @@ export const useGameStore = create<GameState>()(
       updatePlayer: (id, updates) => set(state => ({
         players: state.players.map(p => p.id === id ? { ...p, ...updates } : p),
       })),
+
+      addJailCard: (playerId) => set(state => ({
+        players: state.players.map(p =>
+          p.id === playerId ? { ...p, jailCards: p.jailCards + 1 } : p
+        ),
+      })),
+
+      useJailCard: (playerId) => {
+        const player = get().players.find(p => p.id === playerId);
+        if (!player || player.jailCards <= 0) return false;
+        set(state => ({
+          players: state.players.map(p =>
+            p.id === playerId ? { ...p, jailCards: p.jailCards - 1 } : p
+          ),
+          transactions: [...state.transactions, {
+            id: genId(), type: 'jail_card', fromId: playerId, toId: null,
+            amount: 0, description: `${player.name} used Get Out of Jail Free card`,
+            timestamp: Date.now(),
+          }],
+        }));
+        return true;
+      },
 
       transfer: (fromId, toId, amount, type, description) => {
         const state = get();
@@ -206,6 +234,13 @@ export const useGameStore = create<GameState>()(
           }
         }
 
+        // Restore consumed jail card
+        if (type === 'jail_card' && fromId !== null) {
+          players = players.map(p =>
+            p.id === fromId ? { ...p, jailCards: p.jailCards + 1 } : p
+          );
+        }
+
         // Reverse the money flow (bank is unlimited — only adjust player balances)
         if (fromId === null && toId !== null) {
           players = players.map(p => p.id === toId ? { ...p, balance: p.balance - amount } : p);
@@ -225,6 +260,11 @@ export const useGameStore = create<GameState>()(
       collectSalary: (playerId) => {
         const { settings, transfer } = get();
         transfer(null, playerId, settings.salaryAmount, 'salary', 'Salary — passed Go');
+      },
+
+      payJailFine: (playerId) => {
+        const { transfer } = get();
+        return transfer(playerId, null, 50, 'jail_fine', 'Paid Jail Fine ($50)');
       },
 
       assignProperty: (propertyId, ownerId, price) => set(state => {
@@ -322,7 +362,7 @@ export const useGameStore = create<GameState>()(
       })),
     }),
     {
-      name: 'monopoly-banker-v4',
+      name: 'monopoly-banker-v5',
       storage: createJSONStorage(() => AsyncStorage),
     }
   )
