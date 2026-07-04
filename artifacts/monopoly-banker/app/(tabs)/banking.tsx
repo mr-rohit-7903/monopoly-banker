@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
 import { useGameStore } from '@/store/gameStore';
 import { PlayerSelector } from '@/components/PlayerSelector';
@@ -374,9 +375,8 @@ export default function BankingScreen() {
                 { backgroundColor: CHANCE_COLOR, opacity: pressed ? 0.85 : 1 },
               ]}
             >
-              <Text style={styles.deckBtnEmoji}>🎲</Text>
+              <Image source={require('../../assets/images/chance.png')} style={styles.deckBtnImage} contentFit="contain" />
               <Text style={styles.deckBtnTitle}>Chance</Text>
-              <Text style={styles.deckBtnSub}>16 cards</Text>
             </Pressable>
 
             {/* Community Chest */}
@@ -387,26 +387,9 @@ export default function BankingScreen() {
                 { backgroundColor: COMMUNITY_COLOR, opacity: pressed ? 0.85 : 1 },
               ]}
             >
-              <Text style={styles.deckBtnEmoji}>🏦</Text>
+              <Image source={require('../../assets/images/chest.png')} style={styles.deckBtnImage} contentFit="contain" />
               <Text style={styles.deckBtnTitle}>Community Chest</Text>
-              <Text style={styles.deckBtnSub}>16 cards</Text>
             </Pressable>
-          </View>
-
-          {/* Card type legend */}
-          <View style={styles.legend}>
-            {[
-              { emoji: '💰', label: 'Collect from bank' },
-              { emoji: '💸', label: 'Pay to bank' },
-              { emoji: '🏠', label: 'Repair bill' },
-              { emoji: '🎂', label: 'Collect from players' },
-              { emoji: '🚗', label: 'Move token' },
-            ].map(item => (
-              <View key={item.label} style={styles.legendRow}>
-                <Text style={styles.legendEmoji}>{item.emoji}</Text>
-                <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>{item.label}</Text>
-              </View>
-            ))}
           </View>
         </View>
       </ScrollView>
@@ -502,7 +485,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  deckBtnEmoji: { fontSize: 36 },
+  deckBtnImage: { width: 50, height: 50, marginBottom: 2 },
   deckBtnTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 14,

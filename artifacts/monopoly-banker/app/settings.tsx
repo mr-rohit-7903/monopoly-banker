@@ -55,6 +55,7 @@ export default function SettingsScreen() {
     { value: '€', label: '€ EUR' },
     { value: '£', label: '£ GBP' },
     { value: '¥', label: '¥ JPY' },
+    { value: '₹', label: '₹ INR' },
     { value: 'M', label: 'M Monopoly' },
   ];
 
