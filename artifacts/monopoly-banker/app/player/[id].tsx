@@ -28,12 +28,11 @@ export default function PlayerDetailScreen() {
   const transactions = useGameStore(s => s.transactions);
   const currency = useGameStore(s => s.settings.currency);
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
-  const { updatePlayer, removePlayer, transfer } = useGameStore();
+  const { updatePlayer, removePlayer, transfer, declareBankrupt } = useGameStore();
 
   const [name, setName] = useState(player?.name ?? '');
   const [selectedColor, setSelectedColor] = useState(player?.color ?? PLAYER_COLORS[0]);
   const [editMode, setEditMode] = useState(false);
-  const [adjustAmt, setAdjustAmt] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const topPad = Platform.OS === 'web' ? 16 : insets.top;
@@ -84,18 +83,12 @@ export default function PlayerDetailScreen() {
     router.back();
   }
 
-  function handleAdjust(positive: boolean) {
-    const amt = parseInt(adjustAmt);
-    if (!amt || amt <= 0) return;
-    if (positive) {
-      transfer(null, safePlayer.id, amt, 'bank_give', `Bank gave ${safePlayer.name} ${currency}${amt}`);
-    } else {
-      const ok = transfer(safePlayer.id, null, amt, 'bank_receive', `${safePlayer.name} paid bank ${currency}${amt}`);
-      if (!ok) return;
-    }
+  function handleBankrupt() {
+    declareBankrupt(safePlayer.id);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setAdjustAmt('');
   }
+
+  const canBankrupt = safePlayer.balance === 0 && safePlayer.jailCards === 0 && ownedProperties.length === 0 && !safePlayer.isBankrupt;
 
   const usedColors = allPlayers.filter(p => p.id !== safePlayer.id).map(p => p.color);
 
@@ -177,9 +170,13 @@ export default function PlayerDetailScreen() {
             ) : (
               <Text style={[styles.profileName, { color: palette.foreground }]}>{safePlayer.name}</Text>
             )}
-            <Text style={[styles.profileBalance, { color: palette.primary }]}>
-              {formatMoney(safePlayer.balance, currency)}
-            </Text>
+            {safePlayer.isBankrupt ? (
+              <Text style={[styles.profileBalance, { color: palette.destructive, fontSize: 20 }]}>BANKRUPT</Text>
+            ) : (
+              <Text style={[styles.profileBalance, { color: palette.primary }]}>
+                {formatMoney(safePlayer.balance, currency)}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -293,39 +290,25 @@ export default function PlayerDetailScreen() {
           </View>
         )}
 
-        {/* Quick adjustment */}
-        {!editMode && (
-          <View style={[styles.adjustCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-            <Text style={[styles.sectionLabel, { color: palette.mutedForeground }]}>Adjust Balance</Text>
-            <View style={[styles.adjustInput, { borderColor: palette.border, backgroundColor: palette.muted }]}>
-              <Text style={[styles.adjCurrency, { color: palette.primary }]}>{currency}</Text>
-              <TextInput
-                style={[styles.adjTextInput, { color: palette.foreground }]}
-                keyboardType="numeric"
-                value={adjustAmt}
-                onChangeText={t => setAdjustAmt(t.replace(/[^0-9]/g, ''))}
-                placeholder="Amount"
-                placeholderTextColor={palette.mutedForeground}
-                selectionColor={palette.primary}
-              />
-            </View>
-            <View style={styles.adjBtns}>
-              <Pressable
-                onPress={() => handleAdjust(false)}
-                style={({ pressed }) => [styles.adjBtn, { backgroundColor: palette.destructive + '22', borderColor: palette.destructive + '55', opacity: pressed ? 0.8 : 1 }]}
-              >
-                <MaterialCommunityIcons name="minus" size={18} color={palette.destructive} />
-                <Text style={[styles.adjBtnText, { color: palette.destructive }]}>Pay Bank</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleAdjust(true)}
-                style={({ pressed }) => [styles.adjBtn, { backgroundColor: palette.success + '22', borderColor: palette.success + '55', opacity: pressed ? 0.8 : 1 }]}
-              >
-                <MaterialCommunityIcons name="plus" size={18} color={palette.success} />
-                <Text style={[styles.adjBtnText, { color: palette.success }]}>Receive</Text>
-              </Pressable>
-            </View>
-          </View>
+        {/* Declare Bankrupt button */}
+        {!editMode && !safePlayer.isBankrupt && (
+          <Pressable
+            onPress={handleBankrupt}
+            disabled={!canBankrupt}
+            style={({ pressed }) => [
+              styles.deleteBtn,
+              { 
+                borderColor: canBankrupt ? palette.warning : palette.border, 
+                opacity: pressed ? 0.8 : (canBankrupt ? 1 : 0.5),
+                marginTop: 10
+              }
+            ]}
+          >
+            <MaterialCommunityIcons name="bank-minus" size={18} color={canBankrupt ? palette.warning : palette.mutedForeground} />
+            <Text style={[styles.deleteBtnText, { color: canBankrupt ? palette.warning : palette.mutedForeground }]}>
+              Declare Bankrupt
+            </Text>
+          </Pressable>
         )}
 
         {/* Transaction history */}

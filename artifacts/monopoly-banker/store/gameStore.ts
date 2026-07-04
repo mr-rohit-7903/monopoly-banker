@@ -13,6 +13,7 @@ export interface Player {
   color: string;
   balance: number;
   jailCards: number; // Get Out of Jail Free cards held
+  isBankrupt?: boolean;
 }
 
 export type TransactionType =
@@ -82,6 +83,7 @@ interface GameState {
   addPlayer: (name: string, color: string) => void;
   removePlayer: (id: string) => void;
   updatePlayer: (id: string, updates: { name?: string; color?: string }) => void;
+  declareBankrupt: (id: string) => void;
   addJailCard: (playerId: string) => void;
   useJailCard: (playerId: string) => boolean;
 
@@ -127,6 +129,7 @@ export const useGameStore = create<GameState>()(
           color,
           balance: state.settings.startingMoney,
           jailCards: 0,
+          isBankrupt: false,
         }],
         // Joining is not a transaction — don't log it so the Add Player button stays visible
       })),
@@ -148,6 +151,10 @@ export const useGameStore = create<GameState>()(
         players: state.players.map(p => p.id === id ? { ...p, ...updates } : p),
       })),
 
+      declareBankrupt: (id) => set(state => ({
+        players: state.players.map(p => p.id === id ? { ...p, isBankrupt: true } : p),
+      })),
+
       addJailCard: (playerId) => set(state => ({
         players: state.players.map(p =>
           p.id === playerId ? { ...p, jailCards: p.jailCards + 1 } : p
@@ -156,7 +163,7 @@ export const useGameStore = create<GameState>()(
 
       useJailCard: (playerId) => {
         const player = get().players.find(p => p.id === playerId);
-        if (!player || player.jailCards <= 0) return false;
+        if (!player || player.jailCards <= 0 || player.isBankrupt) return false;
         set(state => ({
           players: state.players.map(p =>
             p.id === playerId ? { ...p, jailCards: p.jailCards - 1 } : p
@@ -176,7 +183,11 @@ export const useGameStore = create<GameState>()(
         // Only check player balances — bank is unlimited
         if (fromId !== null) {
           const from = state.players.find(p => p.id === fromId);
-          if (!from || from.balance < amount) return false;
+          if (!from || from.balance < amount || from.isBankrupt) return false;
+        }
+        if (toId !== null) {
+          const to = state.players.find(p => p.id === toId);
+          if (!to || to.isBankrupt) return false;
         }
 
         set(state => {
@@ -261,7 +272,9 @@ export const useGameStore = create<GameState>()(
       }),
 
       collectSalary: (playerId) => {
-        const { settings, transfer } = get();
+        const { settings, transfer, players } = get();
+        const player = players.find(p => p.id === playerId);
+        if (player?.isBankrupt) return;
         transfer(null, playerId, settings.salaryAmount, 'salary', 'Salary — passed Go');
       },
 
@@ -357,7 +370,7 @@ export const useGameStore = create<GameState>()(
         const state = get();
         const playerA = state.players.find(p => p.id === playerAId);
         const playerB = state.players.find(p => p.id === playerBId);
-        if (!playerA || !playerB) return false;
+        if (!playerA || !playerB || playerA.isBankrupt || playerB.isBankrupt) return false;
 
         // Net money change for each player
         const netA = moneyBtoA - moneyAtoB; // positive = A receives net
