@@ -21,7 +21,8 @@ export type TransactionType =
   | 'mortgage' | 'unmortgage'
   | 'property_buy' | 'property_sell'
   | 'chance_card' | 'community_card'
-  | 'jail_fine' | 'jail_card';
+  | 'jail_fine' | 'jail_card'
+  | 'trade';
 
 export interface Transaction {
   id: string;
@@ -94,6 +95,16 @@ interface GameState {
   assignProperty: (propertyId: string, ownerId: string | null, price: number) => void;
   setHouses: (propertyId: string, houses: number, hotel: boolean) => void;
   toggleMortgage: (propertyId: string) => void;
+
+  // Trade actions
+  executeTrade: (trade: {
+    playerAId: string;
+    playerBId: string;
+    moneyAtoB: number;       // money A gives to B
+    moneyBtoA: number;       // money B gives to A
+    propsAtoB: string[];     // property IDs A gives to B
+    propsBtoA: string[];     // property IDs B gives to A
+  }) => boolean;
 
   // Game actions
   resetGame: () => void;
@@ -341,6 +352,68 @@ export const useGameStore = create<GameState>()(
           }],
         };
       }),
+
+      executeTrade: ({ playerAId, playerBId, moneyAtoB, moneyBtoA, propsAtoB, propsBtoA }) => {
+        const state = get();
+        const playerA = state.players.find(p => p.id === playerAId);
+        const playerB = state.players.find(p => p.id === playerBId);
+        if (!playerA || !playerB) return false;
+
+        // Net money change for each player
+        const netA = moneyBtoA - moneyAtoB; // positive = A receives net
+        const netB = moneyAtoB - moneyBtoA; // positive = B receives net
+
+        // Check balances
+        if (playerA.balance + netA < 0) return false;
+        if (playerB.balance + netB < 0) return false;
+
+        // Validate property ownership
+        for (const pid of propsAtoB) {
+          if (state.propertyOwnerships[pid]?.ownerId !== playerAId) return false;
+        }
+        for (const pid of propsBtoA) {
+          if (state.propertyOwnerships[pid]?.ownerId !== playerBId) return false;
+        }
+
+        // Build description
+        const parts: string[] = [];
+        if (moneyAtoB > 0) parts.push(`${playerA.name} pays ${state.settings.currency}${moneyAtoB}`);
+        if (moneyBtoA > 0) parts.push(`${playerB.name} pays ${state.settings.currency}${moneyBtoA}`);
+        const propNames = (ids: string[]) =>
+          ids.map(id => MONOPOLY_PROPERTIES.find(p => p.id === id)?.name ?? id).join(', ');
+        if (propsAtoB.length > 0) parts.push(`${playerA.name} gives ${propNames(propsAtoB)}`);
+        if (propsBtoA.length > 0) parts.push(`${playerB.name} gives ${propNames(propsBtoA)}`);
+        const description = `Trade: ${parts.join(' · ')}`;
+
+        set(state => {
+          const players = state.players.map(p => {
+            if (p.id === playerAId) return { ...p, balance: p.balance + netA };
+            if (p.id === playerBId) return { ...p, balance: p.balance + netB };
+            return p;
+          });
+
+          const ownerships = { ...state.propertyOwnerships };
+          for (const pid of propsAtoB) {
+            ownerships[pid] = { ...ownerships[pid], ownerId: playerBId };
+          }
+          for (const pid of propsBtoA) {
+            ownerships[pid] = { ...ownerships[pid], ownerId: playerAId };
+          }
+
+          return {
+            players,
+            propertyOwnerships: ownerships,
+            transactions: [...state.transactions, {
+              id: genId(), type: 'trade' as const,
+              fromId: playerAId, toId: playerBId,
+              amount: moneyAtoB + moneyBtoA,
+              description,
+              timestamp: Date.now(),
+            }],
+          };
+        });
+        return true;
+      },
 
       resetGame: () => set({
         players: [],

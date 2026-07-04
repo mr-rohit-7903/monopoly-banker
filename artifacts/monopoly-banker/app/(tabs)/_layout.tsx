@@ -20,6 +20,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: 'banknote', selected: 'banknote.fill' }} />
         <Label>Bank</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="trade">
+        <Icon sf={{ default: 'arrow.triangle.2.circlepath', selected: 'arrow.triangle.2.circlepath' }} />
+        <Label>Trade</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="properties">
         <Icon sf={{ default: 'building.2', selected: 'building.2.fill' }} />
         <Label>Properties</Label>
@@ -94,6 +98,18 @@ function ClassicTabLayout() {
               <SymbolView name="banknote" tintColor={color} size={22} />
             ) : (
               <MaterialCommunityIcons name="bank-transfer" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="trade"
+        options={{
+          title: 'Trade',
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="arrow.triangle.2.circlepath" tintColor={color} size={22} />
+            ) : (
+              <MaterialCommunityIcons name="swap-horizontal" size={22} color={color} />
             ),
         }}
       />
