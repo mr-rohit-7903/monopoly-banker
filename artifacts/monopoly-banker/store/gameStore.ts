@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MONOPOLY_PROPERTIES, BANK_STARTING_BALANCE, STANDARD_STARTING_MONEY, SALARY_AMOUNT, INCOME_TAX_AMOUNT, LUXURY_TAX_AMOUNT } from '@/constants/monopoly';
+import { MONOPOLY_PROPERTIES, STANDARD_STARTING_MONEY, SALARY_AMOUNT, INCOME_TAX_AMOUNT, LUXURY_TAX_AMOUNT } from '@/constants/monopoly';
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -73,7 +73,6 @@ interface GameState {
   transactions: Transaction[];
   propertyOwnerships: Record<string, PropertyOwnership>;
   settings: GameSettings;
-  bankBalance: number;
   gameStartTime: number;
 
   // Player actions
@@ -103,7 +102,6 @@ export const useGameStore = create<GameState>()(
       transactions: [],
       propertyOwnerships: initOwnerships(),
       settings: DEFAULT_SETTINGS,
-      bankBalance: BANK_STARTING_BALANCE,
       gameStartTime: Date.now(),
 
       addPlayer: (name, color) => set(state => ({
@@ -113,7 +111,6 @@ export const useGameStore = create<GameState>()(
           color,
           balance: state.settings.startingMoney,
         }],
-        bankBalance: state.bankBalance - state.settings.startingMoney,
         transactions: [...state.transactions, {
           id: genId(),
           type: 'bank_give',
@@ -130,7 +127,6 @@ export const useGameStore = create<GameState>()(
         if (!player) return state;
         return {
           players: state.players.filter(p => p.id !== id),
-          bankBalance: state.bankBalance + player.balance,
           propertyOwnerships: Object.fromEntries(
             Object.entries(state.propertyOwnerships).map(([pid, o]) =>
               [pid, o.ownerId === id ? { ...o, ownerId: null } : o]
@@ -146,23 +142,19 @@ export const useGameStore = create<GameState>()(
       transfer: (fromId, toId, amount, type, description) => {
         const state = get();
         if (amount <= 0) return false;
+        // Only check player balances — bank is unlimited
         if (fromId !== null) {
           const from = state.players.find(p => p.id === fromId);
           if (!from || from.balance < amount) return false;
-        } else {
-          if (state.bankBalance < amount) return false;
         }
 
         set(state => {
           let players = [...state.players];
-          let bankBalance = state.bankBalance;
 
           if (fromId === null && toId !== null) {
             players = players.map(p => p.id === toId ? { ...p, balance: p.balance + amount } : p);
-            bankBalance -= amount;
           } else if (fromId !== null && toId === null) {
             players = players.map(p => p.id === fromId ? { ...p, balance: p.balance - amount } : p);
-            bankBalance += amount;
           } else if (fromId !== null && toId !== null) {
             players = players.map(p => {
               if (p.id === fromId) return { ...p, balance: p.balance - amount };
@@ -173,7 +165,6 @@ export const useGameStore = create<GameState>()(
 
           return {
             players,
-            bankBalance,
             transactions: [...state.transactions, {
               id: genId(), type, fromId, toId, amount, description, timestamp: Date.now(),
             }],
@@ -189,7 +180,6 @@ export const useGameStore = create<GameState>()(
         const { fromId, toId, amount, type } = last;
 
         let players = [...state.players];
-        let bankBalance = state.bankBalance;
         let propertyOwnerships = { ...state.propertyOwnerships };
 
         if (type === 'mortgage' || type === 'unmortgage') {
@@ -216,13 +206,11 @@ export const useGameStore = create<GameState>()(
           }
         }
 
-        // Reverse the money flow
+        // Reverse the money flow (bank is unlimited — only adjust player balances)
         if (fromId === null && toId !== null) {
           players = players.map(p => p.id === toId ? { ...p, balance: p.balance - amount } : p);
-          bankBalance += amount;
         } else if (fromId !== null && toId === null) {
           players = players.map(p => p.id === fromId ? { ...p, balance: p.balance + amount } : p);
-          bankBalance -= amount;
         } else if (fromId !== null && toId !== null) {
           players = players.map(p => {
             if (p.id === fromId) return { ...p, balance: p.balance + amount };
@@ -231,7 +219,7 @@ export const useGameStore = create<GameState>()(
           });
         }
 
-        return { players, bankBalance, propertyOwnerships, transactions };
+        return { players, propertyOwnerships, transactions };
       }),
 
       collectSalary: (playerId) => {
@@ -243,32 +231,30 @@ export const useGameStore = create<GameState>()(
         const prev = state.propertyOwnerships[propertyId];
         const prevOwnerId = prev?.ownerId ?? null;
         let players = state.players;
-        let bankBalance = state.bankBalance;
         const transactions = [...state.transactions];
 
         if (ownerId !== null && price > 0) {
+          // Player buying from bank — deduct from player only (bank is unlimited)
           const buyer = state.players.find(p => p.id === ownerId);
           if (!buyer || buyer.balance < price) return state;
           players = players.map(p => p.id === ownerId ? { ...p, balance: p.balance - price } : p);
-          bankBalance += price;
           transactions.push({
             id: genId(), type: 'property_buy', fromId: ownerId, toId: null,
             amount: price, description: `Bought ${MONOPOLY_PROPERTIES.find(p => p.id === propertyId)?.name}`,
             timestamp: Date.now(), propertyId, prevOwnerId,
           });
-        } else if (ownerId === null && prevOwnerId !== null && price > 0) {
-          players = players.map(p => p.id === prevOwnerId ? { ...p, balance: p.balance + price } : p);
-          bankBalance -= price;
+        } else if (ownerId !== null && price === 0 && prevOwnerId !== null) {
+          // Player-to-player trade (no money changes hands)
           transactions.push({
-            id: genId(), type: 'property_sell', fromId: null, toId: prevOwnerId,
-            amount: price, description: `Sold ${MONOPOLY_PROPERTIES.find(p => p.id === propertyId)?.name}`,
+            id: genId(), type: 'property_buy', fromId: ownerId, toId: null,
+            amount: 0, description: `Traded ${MONOPOLY_PROPERTIES.find(p => p.id === propertyId)?.name}`,
             timestamp: Date.now(), propertyId, prevOwnerId,
           });
         }
+        // Returning a property to the bank is not allowed once purchased
 
         return {
           players,
-          bankBalance,
           transactions,
           propertyOwnerships: {
             ...state.propertyOwnerships,
@@ -310,7 +296,6 @@ export const useGameStore = create<GameState>()(
             if (p.id !== ownerId) return p;
             return { ...p, balance: isMortgaging ? p.balance + mortgageValue : p.balance - unmortgageCost };
           }),
-          bankBalance: isMortgaging ? state.bankBalance - mortgageValue : state.bankBalance + unmortgageCost,
           transactions: [...state.transactions, {
             id: genId(),
             type: isMortgaging ? 'mortgage' : 'unmortgage',
@@ -329,7 +314,6 @@ export const useGameStore = create<GameState>()(
         players: [],
         transactions: [],
         propertyOwnerships: initOwnerships(),
-        bankBalance: BANK_STARTING_BALANCE,
         gameStartTime: Date.now(),
       }),
 
@@ -338,7 +322,7 @@ export const useGameStore = create<GameState>()(
       })),
     }),
     {
-      name: 'monopoly-banker-v3',
+      name: 'monopoly-banker-v4',
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

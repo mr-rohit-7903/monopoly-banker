@@ -10,7 +10,7 @@ import { useColors } from '@/hooks/useColors';
 import { useGameStore } from '@/store/gameStore';
 import { PlayerCard } from '@/components/PlayerCard';
 import { DiceRoller } from '@/components/DiceRoller';
-import { formatMoney } from '@/utils/format';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function PlayersScreen() {
@@ -18,7 +18,6 @@ export default function PlayersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players);
-  const bankBalance = useGameStore(s => s.bankBalance);
   const currency = useGameStore(s => s.settings.currency);
   const [diceVisible, setDiceVisible] = useState(false);
 
@@ -60,10 +59,8 @@ export default function PlayersScreen() {
         <View style={[styles.bankCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <MaterialCommunityIcons name="bank" size={22} color={colors.primary} />
           <View>
-            <Text style={[styles.bankLabel, { color: colors.mutedForeground }]}>Bank Balance</Text>
-            <Text style={[styles.bankAmount, { color: colors.foreground }]}>
-              {formatMoney(bankBalance, currency)}
-            </Text>
+            <Text style={[styles.bankLabel, { color: colors.mutedForeground }]}>Bank</Text>
+            <Text style={[styles.bankAmount, { color: colors.foreground }]}>Unlimited</Text>
           </View>
         </View>
 

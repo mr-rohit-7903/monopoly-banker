@@ -13,7 +13,7 @@ export default function StatsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players);
-  const bankBalance = useGameStore(s => s.bankBalance);
+
   const transactions = useGameStore(s => s.transactions);
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
   const currency = useGameStore(s => s.settings.currency);
@@ -97,8 +97,8 @@ export default function StatsScreen() {
                 icon="cash-multiple"
               />
               <StatCard
-                label="Bank Balance"
-                value={formatMoney(bankBalance, currency)}
+                label="Bank"
+                value="Unlimited"
                 icon="bank"
                 accent
               />

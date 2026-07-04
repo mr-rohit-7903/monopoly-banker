@@ -37,24 +37,31 @@ function PropertyDetailModal({
 
             {/* Owner */}
             <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Owner</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownerRow}>
-              <Pressable
-                onPress={() => { assignProperty(property.id, null, 0); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-                style={[styles.ownerChip, { backgroundColor: !owner ? colors.primary + '22' : colors.muted, borderColor: !owner ? colors.primary : colors.border }]}
-              >
-                <Text style={[styles.ownerChipText, { color: !owner ? colors.primary : colors.foreground }]}>Bank</Text>
-              </Pressable>
-              {players.map(p => (
-                <Pressable
-                  key={p.id}
-                  onPress={() => { assignProperty(property.id, p.id, ownership.ownerId ? 0 : property.price); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-                  style={[styles.ownerChip, { backgroundColor: owner?.id === p.id ? p.color + '22' : colors.muted, borderColor: owner?.id === p.id ? p.color : colors.border }]}
-                >
-                  <PlayerAvatar name={p.name} color={p.color} size={22} />
-                  <Text style={[styles.ownerChipText, { color: owner?.id === p.id ? p.color : colors.foreground }]}>{p.name}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+            {players.length === 0 ? (
+              <Text style={[styles.detailPrice, { color: colors.mutedForeground }]}>No players in game yet</Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownerRow}>
+                {!owner && (
+                  <View style={[styles.ownerChip, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <Text style={[styles.ownerChipText, { color: colors.mutedForeground }]}>Unowned</Text>
+                  </View>
+                )}
+                {players.map(p => (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => {
+                      if (owner?.id === p.id) return; // already owned by this player
+                      assignProperty(property.id, p.id, ownership.ownerId ? 0 : property.price);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={[styles.ownerChip, { backgroundColor: owner?.id === p.id ? p.color + '22' : colors.muted, borderColor: owner?.id === p.id ? p.color : colors.border }]}
+                  >
+                    <PlayerAvatar name={p.name} color={p.color} size={22} />
+                    <Text style={[styles.ownerChipText, { color: owner?.id === p.id ? p.color : colors.foreground }]}>{p.name}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
 
             {/* Houses/Hotels for properties */}
             {property.type === 'property' && owner && (
@@ -136,6 +143,11 @@ export default function PropertiesScreen() {
   const [selectedProperty, setSelectedProperty] = useState<MonopolyProperty | null>(null);
   const [filterGroup, setFilterGroup] = useState<string | null>(null);
 
+  // Subscribe to store so the grid re-renders on ownership changes
+  const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
+  const players = useGameStore(s => s.players);
+  const currency = useGameStore(s => s.settings.currency);
+
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const filteredGroups = filterGroup
@@ -193,8 +205,7 @@ export default function PropertiesScreen() {
               </View>
               <View style={styles.propGrid}>
                 {props.map(prop => {
-                  const ownership = useGameStore.getState().propertyOwnerships[prop.id];
-                  const players = useGameStore.getState().players;
+                  const ownership = propertyOwnerships[prop.id];
                   const owner = ownership?.ownerId ? players.find(p => p.id === ownership.ownerId) : null;
                   const isMortgaged = ownership?.isMortgaged;
                   return (
@@ -214,7 +225,7 @@ export default function PropertiesScreen() {
                         </View>
                         <View style={styles.propFooter}>
                           <Text style={[styles.propPrice, { color: colors.mutedForeground }]}>
-                            {formatMoney(useGameStore.getState().settings.currency === '$' ? prop.price : prop.price, useGameStore.getState().settings.currency)}
+                            {formatMoney(prop.price, currency)}
                           </Text>
                           {isMortgaged && (
                             <Text style={[styles.mortgagedBadge, { color: colors.destructive }]}>M</Text>
