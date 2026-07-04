@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Platform, Pressable, ScrollView,
+  Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -22,12 +22,51 @@ export default function PlayersScreen() {
   const transactions = useGameStore(s => s.transactions);
   const [diceVisible, setDiceVisible] = useState(false);
 
+  const { restartGame } = useGameStore();
+  const [winnerAcknowledged, setWinnerAcknowledged] = useState(false);
+
   const topPad = Platform.OS === 'web' ? 16 : insets.top;
   const canAddPlayer = players.length < MAX_PLAYERS && transactions.length === 0;
+
+  const activePlayers = players.filter(p => !p.isBankrupt);
+  const hasWinner = players.length > 1 && activePlayers.length === 1 && !winnerAcknowledged;
+  const winner = activePlayers[0];
+
+  function handleRestart() {
+    restartGame();
+    setWinnerAcknowledged(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <DiceRoller visible={diceVisible} onClose={() => setDiceVisible(false)} />
+
+      {/* Winner Modal */}
+      <Modal visible={hasWinner} transparent animationType="slide">
+        <View style={styles.overlay}>
+          <View style={[styles.winnerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <MaterialCommunityIcons name="trophy" size={64} color="#FFD700" />
+            <Text style={[styles.winnerTitle, { color: colors.foreground }]}>{winner?.name} Wins!</Text>
+            <Text style={[styles.winnerSub, { color: colors.mutedForeground }]}>All other players have gone bankrupt.</Text>
+            
+            <View style={styles.winnerBtns}>
+              <Pressable
+                onPress={() => setWinnerAcknowledged(true)}
+                style={({ pressed }) => [styles.winnerCancel, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={[styles.winnerCancelText, { color: colors.foreground }]}>Close</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleRestart}
+                style={({ pressed }) => [styles.winnerConfirm, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Text style={styles.winnerConfirmText}>Restart Game</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -138,4 +177,23 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
+  // Winner Modal
+  overlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center', padding: 24,
+  },
+  winnerCard: {
+    width: '100%', borderRadius: 20, borderWidth: 1,
+    padding: 32, alignItems: 'center', gap: 12,
+  },
+  winnerTitle: { fontFamily: 'Inter_700Bold', fontSize: 24, textAlign: 'center', marginTop: 8 },
+  winnerSub: { fontFamily: 'Inter_400Regular', fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 12 },
+  winnerBtns: { flexDirection: 'row', gap: 12, width: '100%' },
+  winnerCancel: {
+    flex: 1, paddingVertical: 14, borderRadius: 12,
+    borderWidth: 1.5, alignItems: 'center',
+  },
+  winnerCancelText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+  winnerConfirm: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  winnerConfirmText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#fff' },
 });

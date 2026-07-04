@@ -110,6 +110,7 @@ interface GameState {
 
   // Game actions
   resetGame: () => void;
+  restartGame: () => void;
   updateSettings: (updates: Partial<GameSettings>) => void;
 }
 
@@ -434,6 +435,18 @@ export const useGameStore = create<GameState>()(
         propertyOwnerships: initOwnerships(),
         gameStartTime: Date.now(),
       }),
+
+      restartGame: () => set(state => ({
+        players: state.players.map(p => ({
+          ...p,
+          balance: state.settings.startingMoney,
+          jailCards: 0,
+          isBankrupt: false,
+        })),
+        transactions: [],
+        propertyOwnerships: initOwnerships(),
+        gameStartTime: Date.now(),
+      })),
 
       updateSettings: (updates) => set(state => ({
         settings: { ...state.settings, ...updates },
