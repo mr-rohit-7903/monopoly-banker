@@ -30,6 +30,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "98c5cc24-0a09-4cd3-9a78-79b2d28912d0"
+      }
+    },
+    "owner": "rohitbejs-team"
   }
 }
