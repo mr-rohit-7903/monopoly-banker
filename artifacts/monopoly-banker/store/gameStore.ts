@@ -117,15 +117,7 @@ export const useGameStore = create<GameState>()(
           balance: state.settings.startingMoney,
           jailCards: 0,
         }],
-        transactions: [...state.transactions, {
-          id: genId(),
-          type: 'bank_give',
-          fromId: null,
-          toId: 'new_player',
-          amount: state.settings.startingMoney,
-          description: `${name.trim()} joined the game`,
-          timestamp: Date.now(),
-        }],
+        // Joining is not a transaction — don't log it so the Add Player button stays visible
       })),
 
       removePlayer: (id) => set(state => {
