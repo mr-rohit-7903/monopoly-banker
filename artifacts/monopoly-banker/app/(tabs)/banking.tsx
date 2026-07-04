@@ -39,6 +39,9 @@ export default function BankingScreen() {
   // Transaction success confirmation
   const [txConfirm, setTxConfirm] = useState<{ emoji: string; title: string; sub: string } | null>(null);
 
+  // Error / Alert Modal
+  const [alertModal, setAlertModal] = useState<{ title: string; message: string } | null>(null);
+
   function showConfirm(emoji: string, title: string, sub: string) {
     setTxConfirm({ emoji, title, sub });
   }
@@ -53,7 +56,7 @@ export default function BankingScreen() {
   function handleTransfer() {
     const amt = parseInt(amount);
     if (!amt || amt <= 0) return;
-    if (fromId === toId) { Alert.alert('Invalid', 'From and To must be different'); return; }
+    if (fromId === toId) { setAlertModal({ title: 'Invalid', message: 'From and To must be different' }); return; }
     const fromName = fromId ? players.find(p => p.id === fromId)?.name : 'Bank';
     const toName   = toId   ? players.find(p => p.id === toId)?.name   : 'Bank';
     const ok = transfer(fromId, toId, amt, 'transfer', `${fromName} → ${toName}`);
@@ -63,13 +66,13 @@ export default function BankingScreen() {
       showConfirm('✅', 'Transfer Complete', `${formatMoney(amt, settings.currency)} from ${fromName} to ${toName}`);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Insufficient funds', 'The sender does not have enough money.');
+      setAlertModal({ title: 'Insufficient Funds', message: 'The sender does not have enough money.' });
     }
   }
 
   // ── Quick actions ─────────────────────────────────────────────────────────
   function handleQuick(action: 'salary' | 'income' | 'luxury') {
-    if (!quickPlayerId) { Alert.alert('Select a player first'); return; }
+    if (!quickPlayerId) { setAlertModal({ title: 'Select a Player', message: 'Please select a player first.' }); return; }
     const playerName = players.find(p => p.id === quickPlayerId)?.name ?? 'Player';
     if (action === 'salary') {
       collectSalary(quickPlayerId);
@@ -85,19 +88,19 @@ export default function BankingScreen() {
         showConfirm('💸', `${label} Paid`, `${playerName} paid ${formatMoney(amt, settings.currency)} to the bank`);
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert('Insufficient funds');
+        setAlertModal({ title: 'Low Balance', message: `${playerName} does not have enough money to pay the ${label}.` });
       }
     }
   }
 
   function handleJail() {
-    if (!quickPlayerId) { Alert.alert('Select a player first'); return; }
+    if (!quickPlayerId) { setAlertModal({ title: 'Select a Player', message: 'Please select a player first.' }); return; }
     setJailVisible(true);
   }
 
   // ── Card draw ─────────────────────────────────────────────────────────────
   function handleDraw(deck: 'chance' | 'community') {
-    if (!cardDrawerId) { Alert.alert('Select a player first', 'Tap a player above then draw a card'); return; }
+    if (!cardDrawerId) { setAlertModal({ title: 'Select a Player', message: 'Tap a player above then draw a card.' }); return; }
     const card = pickRandom(deck === 'chance' ? CHANCE_CARDS : COMMUNITY_CHEST_CARDS);
     setDrawnCard(card);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -108,6 +111,23 @@ export default function BankingScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {/* ── Error / Alert Modal ── */}
+      <Modal visible={!!alertModal} transparent animationType="fade" onRequestClose={() => setAlertModal(null)}>
+        <Pressable style={confirmStyles.overlay} onPress={() => setAlertModal(null)}>
+          <Pressable style={[confirmStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={confirmStyles.emoji}>⚠️</Text>
+            <Text style={[confirmStyles.title, { color: colors.foreground }]}>{alertModal?.title}</Text>
+            <Text style={[confirmStyles.sub, { color: colors.mutedForeground }]}>{alertModal?.message}</Text>
+            <Pressable
+              onPress={() => setAlertModal(null)}
+              style={({ pressed }) => [confirmStyles.okBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+            >
+              <Text style={[confirmStyles.okText, { color: colors.primaryForeground }]}>Okay</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <CardDrawModal
         card={drawnCard}
         drawerId={cardDrawerId}
@@ -162,7 +182,7 @@ export default function BankingScreen() {
                         showConfirm('🔓', 'Released from Jail', `${jailPlayer.name} paid ${formatMoney(50, settings.currency)} fine`);
                       } else {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                        Alert.alert('Insufficient funds', `${jailPlayer.name} cannot afford the $50 fine.`);
+                        setAlertModal({ title: 'Insufficient Funds', message: `${jailPlayer.name} cannot afford the $50 fine.` });
                       }
                     }}
                     style={({ pressed }) => [
