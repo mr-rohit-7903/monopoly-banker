@@ -76,7 +76,7 @@ export default function BankingScreen() {
   }
 
   // ── Quick actions ─────────────────────────────────────────────────────────
-  function handleQuick(action: 'salary' | 'income' | 'luxury') {
+  function handleQuick(action: 'salary' | 'income' | 'luxury' | 'freeparking') {
     if (!quickPlayerId) { setAlertModal({ title: 'Select a Player', message: 'Please select a player first.' }); return; }
     const playerName = players.find(p => p.id === quickPlayerId)?.name ?? 'Player';
     if (action === 'salary') {

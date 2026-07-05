@@ -246,6 +246,7 @@ export default function TradeScreen() {
                   onMoneyChange={setMoneyAtoB}
                   selectedProps={propsAtoB}
                   ownedProps={propsOwnedByA}
+                  allProps={properties}
                   onToggleProp={(id) => toggleProp(id, 'A')}
                   palette={palette}
                   currency={currency}
@@ -260,6 +261,7 @@ export default function TradeScreen() {
                   onMoneyChange={setMoneyBtoA}
                   selectedProps={propsBtoA}
                   ownedProps={propsOwnedByB}
+                  allProps={properties}
                   onToggleProp={(id) => toggleProp(id, 'B')}
                   palette={palette}
                   currency={currency}
@@ -332,17 +334,18 @@ function PlayerSlot({ label, player, palette, onPress }: {
   );
 }
 
-function TradeSide({ player, otherPlayer, money, onMoneyChange, selectedProps, ownedProps, onToggleProp, palette, currency, propertyOwnerships }: {
+function TradeSide({ player, otherPlayer, money, onMoneyChange, selectedProps, ownedProps, allProps, onToggleProp, palette, currency, propertyOwnerships }: {
   player: Player;
   otherPlayer: Player;
   money: string;
   onMoneyChange: (v: string) => void;
   selectedProps: string[];
   ownedProps: ReturnType<typeof useProperties>;
+  allProps: ReturnType<typeof useProperties>;
   onToggleProp: (id: string) => void;
   palette: ReturnType<typeof useColors>;
   currency: string;
-  propertyOwnerships: Record<string, { ownerId: string | null; isMortgaged: boolean }>;
+  propertyOwnerships: Record<string, { ownerId: string | null; isMortgaged: boolean; houses: number; hotel: boolean }>;
 }) {
   return (
     <View style={[styles.offerCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
@@ -391,16 +394,29 @@ function TradeSide({ player, otherPlayer, money, onMoneyChange, selectedProps, o
               {ownedProps.map(prop => {
                 const selected = selectedProps.includes(prop.id);
                 const mortgaged = propertyOwnerships[prop.id]?.isMortgaged;
+                
+                // Check if any property in this group has buildings
+                const groupProps = allProps.filter(p => p.group === prop.group);
+                const hasBuildings = groupProps.some(p => {
+                  const own = propertyOwnerships[p.id];
+                  return own && (own.houses > 0 || own.hotel);
+                });
+
                 return (
                   <Pressable
                     key={prop.id}
-                    onPress={() => { onToggleProp(prop.id); Haptics.selectionAsync(); }}
+                    onPress={() => {
+                      if (hasBuildings) return;
+                      onToggleProp(prop.id); 
+                      Haptics.selectionAsync(); 
+                    }}
                     style={[
                       styles.propChip,
                       {
                         backgroundColor: selected ? prop.groupColor + '33' : palette.muted,
                         borderColor: selected ? prop.groupColor : palette.border,
                         borderWidth: selected ? 2 : 1,
+                        opacity: hasBuildings ? 0.4 : 1,
                       },
                     ]}
                   >
@@ -411,7 +427,10 @@ function TradeSide({ player, otherPlayer, money, onMoneyChange, selectedProps, o
                     >
                       {prop.name}
                     </Text>
-                    {mortgaged && (
+                    {hasBuildings && (
+                      <MaterialCommunityIcons name="home-lock" size={14} color={palette.destructive} style={{ marginLeft: 2 }} />
+                    )}
+                    {mortgaged && !hasBuildings && (
                       <MaterialCommunityIcons name="alert-circle-outline" size={12} color={palette.destructive} />
                     )}
                     {selected && (

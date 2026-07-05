@@ -38,9 +38,24 @@ export default function StatsScreen() {
     count: Object.values(propertyOwnerships).filter(o => o.ownerId === p.id).length,
     netWorth: p.balance + Object.entries(propertyOwnerships)
       .filter(([, o]) => o.ownerId === p.id)
-      .reduce((sum, [id]) => {
+      .reduce((sum, [id, o]) => {
         const prop = properties.find(pp => pp.id === id);
-        return sum + (prop?.price ?? 0);
+        if (!prop) return sum;
+        let propValue = 0;
+        
+        // Add mortgage value ONLY if it's not already mortgaged
+        if (!o.isMortgaged) {
+          propValue += prop.mortgage;
+        }
+
+        // Add value of selling houses/hotel (if any)
+        if (o.hotel) {
+          propValue += 5 * Math.floor(prop.housePrice / 2);
+        } else if ((o.houses ?? 0) > 0) {
+          propValue += o.houses * Math.floor(prop.housePrice / 2);
+        }
+
+        return sum + propValue;
       }, 0),
   })).sort((a, b) => b.netWorth - a.netWorth);
 

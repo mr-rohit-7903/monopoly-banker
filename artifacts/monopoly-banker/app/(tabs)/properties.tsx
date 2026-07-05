@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Modal, Platform, Pressable, ScrollView,
+  Alert, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,7 +21,16 @@ function PropertyDetailModal({
   const players = useGameStore(s => s.players);
   const ownership = useGameStore(s => property ? s.propertyOwnerships[property.id] : undefined);
   const currency = useGameStore(s => s.settings.currency);
-  const { assignProperty, setHouses, toggleMortgage } = useGameStore();
+  const { assignProperty, setHouses, toggleMortgage, transfer } = useGameStore();
+  const propertiesList = useProperties();
+
+  const groupProps = property ? propertiesList.filter(p => p.group === property.group) : [];
+  const hasBuildingsInGroup = useGameStore(s => {
+    return groupProps.some(p => {
+      const own = s.propertyOwnerships[p.id];
+      return own && (own.houses > 0 || own.hotel);
+    });
+  });
 
   // Buy confirmation state
   const [buyTarget, setBuyTarget] = useState<Player | null>(null);
@@ -117,7 +126,11 @@ function PropertyDetailModal({
                         onPress={() => {
                           const amt = parseInt(buyPriceStr) || 0;
                           if (amt > buyTarget.balance) {
-                            Alert.alert('Low Balance', `${buyTarget.name} does not have enough money.`);
+                            const shortfall = amt - buyTarget.balance;
+                            Alert.alert(
+                              'Insufficient Balance', 
+                              `${buyTarget.name} has ${formatMoney(buyTarget.balance, currency)} but needs ${formatMoney(amt, currency)}.\n\nShortfall: ${formatMoney(shortfall, currency)}`
+                            );
                             return;
                           }
                           handleConfirmBuy(amt);
@@ -169,55 +182,206 @@ function PropertyDetailModal({
             )}
 
             {/* Houses/Hotels for properties */}
-            {property.type === 'property' && owner && (
-              <>
-                <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Houses / Hotel</Text>
-                <View style={styles.housesRow}>
-                  {[0, 1, 2, 3, 4].map(n => (
-                    <Pressable
-                      key={n}
-                      onPress={() => { setHouses(property.id, n, false); }}
-                      style={[
-                        styles.houseBtn,
-                        { backgroundColor: ownership.houses === n && !ownership.hotel ? '#4CAF50' + '33' : colors.muted, borderColor: ownership.houses === n && !ownership.hotel ? '#4CAF50' : colors.border },
-                      ]}
-                    >
-                      <Text style={[styles.houseBtnText, { color: ownership.houses === n && !ownership.hotel ? '#4CAF50' : colors.foreground }]}>{n}</Text>
-                    </Pressable>
-                  ))}
-                  <Pressable
-                    onPress={() => setHouses(property.id, 0, true)}
-                    style={[
-                      styles.hotelBtn,
-                      { backgroundColor: ownership.hotel ? colors.destructive + '33' : colors.muted, borderColor: ownership.hotel ? colors.destructive : colors.border },
-                    ]}
-                  >
-                    <MaterialCommunityIcons name="home" size={16} color={ownership.hotel ? colors.destructive : colors.foreground} />
-                    <Text style={[styles.houseBtnText, { color: ownership.hotel ? colors.destructive : colors.foreground }]}>Hotel</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
+            {property.type === 'property' && owner && (() => {
+              const groupProps = propertiesList.filter(p => p.group === property.group);
+              const ownsAllOfGroup = groupProps.every(
+                p => useGameStore.getState().propertyOwnerships[p.id]?.ownerId === owner.id
+              );
+              const isAnyGroupPropertyMortgaged = groupProps.some(
+                p => useGameStore.getState().propertyOwnerships[p.id]?.isMortgaged
+              );
+
+              const getBuildingCount = (propId: string) => {
+                const own = useGameStore.getState().propertyOwnerships[propId];
+                if (!own) return 0;
+                if (own.hotel) return 5;
+                return own.houses;
+              };
+
+              const currentCount = getBuildingCount(property.id);
+              const groupCounts = groupProps.map(p => getBuildingCount(p.id));
+              const minCount = Math.min(...groupCounts);
+              const maxCount = Math.max(...groupCounts);
+              const isEvenBuild = currentCount === minCount;
+              const isEvenSell = currentCount === maxCount;
+
+              const canAfford = owner.balance >= property.housePrice;
+
+              let buyDisableReason = '';
+              if (!ownsAllOfGroup) {
+                buyDisableReason = `Requires all ${GROUP_NAMES[property.group]} properties`;
+              } else if (isAnyGroupPropertyMortgaged) {
+                buyDisableReason = 'Cannot build while a property in group is mortgaged';
+              } else if (currentCount >= 5) {
+                buyDisableReason = 'Maximum buildings reached (Hotel)';
+              } else if (!isEvenBuild) {
+                buyDisableReason = 'Must build evenly (add houses to other properties first)';
+              } else if (!canAfford) {
+                buyDisableReason = `Requires ${formatMoney(property.housePrice, currency)} (Insufficient funds)`;
+              }
+
+              const canBuild = !buyDisableReason;
+              const isNextHotel = currentCount === 4;
+              const buyButtonText = isNextHotel ? `Buy Hotel` : `Buy House`;
+
+              const handleBuyHouse = () => {
+                if (!canBuild) return;
+                const description = isNextHotel
+                  ? `Bought Hotel on ${property.name}`
+                  : `Bought House on ${property.name}`;
+
+                const success = transfer(
+                  owner.id,
+                  null,
+                  property.housePrice,
+                  'transfer',
+                  description
+                );
+
+                if (success) {
+                  const nextCount = currentCount + 1;
+                  const houses = nextCount === 5 ? 0 : nextCount;
+                  const hotel = nextCount === 5;
+                  setHouses(property.id, houses, hotel);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                } else {
+                  Alert.alert('Error', 'Transaction failed.');
+                }
+              };
+
+              const sellPrice = Math.floor(property.housePrice / 2);
+              let sellDisableReason = '';
+              if (currentCount === 0) {
+                sellDisableReason = 'No buildings to sell';
+              } else if (!isEvenSell) {
+                sellDisableReason = 'Must sell evenly (remove houses from other properties first)';
+              }
+              const canSell = !sellDisableReason;
+              const isCurrentHotel = currentCount === 5;
+              const sellButtonText = isCurrentHotel ? `Sell Hotel` : `Sell House`;
+
+              const handleSellHouse = () => {
+                if (!canSell) return;
+                const description = isCurrentHotel
+                  ? `Sold Hotel on ${property.name}`
+                  : `Sold House on ${property.name}`;
+
+                const success = transfer(
+                  null, // from Bank
+                  owner.id, // to Player
+                  sellPrice,
+                  'transfer',
+                  description
+                );
+
+                if (success) {
+                  const nextCount = currentCount - 1;
+                  const houses = nextCount; // since nextCount is at most 4
+                  const hotel = false; // can't sell house to get hotel
+                  setHouses(property.id, houses, hotel);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                } else {
+                  Alert.alert('Error', 'Transaction failed.');
+                }
+              };
+
+              return (
+                <>
+                  <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Houses / Hotel</Text>
+                  <View style={styles.houseBuyContainer}>
+                    <View style={styles.houseStatusRow}>
+                      <Text style={[styles.houseStatusText, { color: colors.foreground }]}>
+                        Current: {ownership.hotel ? '1 Hotel' : ownership.houses > 0 ? `${ownership.houses} House${ownership.houses > 1 ? 's' : ''}` : 'None'}
+                      </Text>
+                      <Text style={[styles.housePriceText, { color: colors.mutedForeground }]}>
+                        Cost: {formatMoney(property.housePrice, currency)} / each
+                      </Text>
+                    </View>
+
+                    <View style={styles.houseActionBtns}>
+                      <Pressable
+                        onPress={handleBuyHouse}
+                        disabled={!canBuild}
+                        style={({ pressed }) => [
+                          styles.houseActionBtn,
+                          {
+                            backgroundColor: canBuild ? '#4CAF50' : colors.muted,
+                            borderColor: canBuild ? '#45a049' : colors.border,
+                            opacity: pressed ? 0.8 : 1,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.houseActionBtnText, { color: canBuild ? '#fff' : colors.mutedForeground }]}>
+                          {buyButtonText} (+1)
+                        </Text>
+                        <Text style={[styles.houseActionBtnSub, { color: canBuild ? 'rgba(255,255,255,0.8)' : colors.mutedForeground }]}>
+                          -{formatMoney(property.housePrice, currency)}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={handleSellHouse}
+                        disabled={!canSell}
+                        style={({ pressed }) => [
+                          styles.houseActionBtn,
+                          {
+                            backgroundColor: canSell ? colors.destructive : colors.muted,
+                            borderColor: canSell ? '#D32F2F' : colors.border,
+                            opacity: pressed ? 0.8 : 1,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.houseActionBtnText, { color: canSell ? '#fff' : colors.mutedForeground }]}>
+                          {sellButtonText} (-1)
+                        </Text>
+                        <Text style={[styles.houseActionBtnSub, { color: canSell ? 'rgba(255,255,255,0.8)' : colors.mutedForeground }]}>
+                          +{formatMoney(sellPrice, currency)}
+                        </Text>
+                      </Pressable>
+                    </View>
+
+                    {buyDisableReason && currentCount < 5 ? (
+                      <Text style={[styles.warningText, { color: colors.destructive }]}>
+                        Buy: {buyDisableReason}
+                      </Text>
+                    ) : null}
+                    {sellDisableReason && currentCount > 0 ? (
+                      <Text style={[styles.warningText, { color: colors.destructive }]}>
+                        Sell: {sellDisableReason}
+                      </Text>
+                    ) : null}
+                  </View>
+                </>
+              );
+            })()}
 
             {/* Mortgage */}
             {owner && (
-              <Pressable
-                onPress={() => { toggleMortgage(property.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
-                style={({ pressed }) => [
-                  styles.mortgageBtn,
-                  {
-                    backgroundColor: ownership.isMortgaged ? colors.success + '22' : colors.destructive + '22',
-                    borderColor: ownership.isMortgaged ? colors.success : colors.destructive,
-                    opacity: pressed ? 0.8 : 1,
-                  },
-                ]}
-              >
-                <Text style={[styles.mortgageBtnText, { color: ownership.isMortgaged ? colors.success : colors.destructive }]}>
-                  {ownership.isMortgaged
-                    ? `Unmortgage (+${formatMoney(Math.floor(property.mortgage * 1.1), currency)})`
-                    : `Mortgage (+${formatMoney(property.mortgage, currency)})`}
-                </Text>
-              </Pressable>
+              <View style={{ gap: 4 }}>
+                <Pressable
+                  onPress={() => { toggleMortgage(property.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
+                  disabled={hasBuildingsInGroup && !ownership.isMortgaged}
+                  style={({ pressed }) => [
+                    styles.mortgageBtn,
+                    {
+                      backgroundColor: ownership.isMortgaged ? colors.success + '22' : colors.destructive + '22',
+                      borderColor: ownership.isMortgaged ? colors.success : colors.destructive,
+                      opacity: (hasBuildingsInGroup && !ownership.isMortgaged) ? 0.4 : pressed ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.mortgageBtnText, { color: ownership.isMortgaged ? colors.success : colors.destructive }]}>
+                    {ownership.isMortgaged
+                      ? `Unmortgage (-${formatMoney(Math.floor(property.mortgage * 1.1), currency)})`
+                      : `Mortgage (+${formatMoney(property.mortgage, currency)})`}
+                  </Text>
+                </Pressable>
+                {hasBuildingsInGroup && !ownership.isMortgaged && (
+                  <Text style={[styles.warningText, { color: colors.destructive }]}>
+                    Cannot mortgage while color group has buildings
+                  </Text>
+                )}
+              </View>
             )}
 
             {/* Rent table */}
@@ -395,10 +559,15 @@ const styles = StyleSheet.create({
   confirmBuy: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   confirmBuyText: { fontFamily: 'Inter_700Bold', fontSize: 15, color: '#fff' },
   // Houses
-  housesRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  houseBtn: { width: 44, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  hotelBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 44, borderRadius: 10, borderWidth: 1.5 },
-  houseBtnText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
+  houseBuyContainer: { gap: 8, marginTop: 4 },
+  houseStatusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  houseStatusText: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
+  housePriceText: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  houseActionBtns: { flexDirection: 'row', gap: 10 },
+  houseActionBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  houseActionBtnText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
+  houseActionBtnSub: { fontFamily: 'Inter_500Medium', fontSize: 12, marginTop: 2 },
+  warningText: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 2, textAlign: 'center' },
   mortgageBtn: { paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
   mortgageBtnText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
   rentRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },

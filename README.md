@@ -63,9 +63,9 @@ pnpm dev
 ```
 
 You can run specific platforms with:
-- `pnpm web` (Starts the application in your web browser)
-- `pnpm android` (Starts the application on a connected Android device or emulator)
-- `pnpm ios` (Starts the application on an iOS simulator)
+- `npx pnpm --filter @workspace/monopoly-banker web` (Starts the application in your web browser)
+- `npx pnpm --filter @workspace/monopoly-banker android` (Starts the application on a connected Android device or emulator)
+- `npx pnpm --filter @workspace/monopoly-banker ios` (Starts the application on an iOS simulator)
 
 ## CI/CD & Builds
 

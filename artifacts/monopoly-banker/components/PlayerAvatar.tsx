@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { getInitials } from '@/utils/format';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface Props {
   name: string;
@@ -10,6 +11,8 @@ interface Props {
 
 export function PlayerAvatar({ name, color, size = 44 }: Props) {
   const fontSize = size * 0.38;
+  const isBank = name.trim() === 'Bank';
+  
   return (
     <View
       style={[
@@ -18,13 +21,17 @@ export function PlayerAvatar({ name, color, size = 44 }: Props) {
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: color,
+          backgroundColor: isBank ? '#607D8B' : color,
         },
       ]}
     >
-      <Text style={[styles.initials, { fontSize }]}>
-        {getInitials(name)}
-      </Text>
+      {isBank ? (
+        <MaterialCommunityIcons name="bank" size={fontSize * 1.5} color="#FFFFFF" />
+      ) : (
+        <Text style={[styles.initials, { fontSize }]}>
+          {getInitials(name)}
+        </Text>
+      )}
     </View>
   );
 }
