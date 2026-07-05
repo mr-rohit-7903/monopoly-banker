@@ -46,23 +46,39 @@ jobs:
 
       - name: Extract and Rename APKs
         run: |
-          # If EAS packed multiple APKs into a tarball, extract it
+          echo "Finding produced artifacts..."
+          ls -la build-* || true
+
           if ls build-*.tar.gz 1> /dev/null 2>&1; then
+            echo "Extracting tarball..."
             tar -xzf build-*.tar.gz
             rm build-*.tar.gz
           fi
           
-          # Rename any generated APKs to have clean, readable names
-          for file in *.apk **/*.apk; do
-            if [[ -f "$file" ]]; then
-              for arch in arm64-v8a armeabi-v7a x86_64 x86 universal; do
-                if [[ "$file" == *"$arch"* ]]; then
-                  mv "$file" "monopoly-banker-$arch.apk"
-                  break
-                fi
-              done
+          echo "Looking for all APK files..."
+          find . -name "*.apk" | while read -r file; do
+            echo "Found APK: $file"
+            
+            # Detect architecture from filename
+            renamed=false
+            for arch in arm64-v8a armeabi-v7a x86_64 x86; do
+              if [[ "$file" == *"$arch"* ]]; then
+                echo "Renaming to monopoly-banker-$arch.apk"
+                mv "$file" "./monopoly-banker-$arch.apk"
+                renamed=true
+                break
+              fi
+            done
+            
+            # If no architecture was found, it must be universal
+            if [ "$renamed" = false ]; then
+              echo "Renaming to monopoly-banker-universal.apk"
+              mv "$file" "./monopoly-banker-universal.apk"
             fi
           done
+          
+          echo "Final APKs ready for upload:"
+          ls -la monopoly-banker-*.apk || true
         working-directory: artifacts/monopoly-banker
         
       - name: Upload APK artifact
