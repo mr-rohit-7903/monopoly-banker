@@ -274,7 +274,13 @@ export default function BankingScreen() {
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
           </View>
-          <PlayerSelector players={players} selectedId={toId} onSelect={setToId} includeBank label="To" />
+          <PlayerSelector 
+            players={players.filter(p => p.id !== fromId)} 
+            selectedId={toId} 
+            onSelect={setToId} 
+            includeBank={fromId !== null} 
+            label="To" 
+          />
           <AmountInput value={amount} onChange={setAmount} label="Amount" />
           <Pressable
             onPress={handleTransfer}
