@@ -56,3 +56,13 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: artifacts/monopoly-banker/build-*.apk
+          body: |
+            ### Monopoly Banker Release 
+            
+            We now provide smaller, optimized APKs for different Android devices instead of one large file!
+            
+            **Which one should I download?**
+            *   **`arm64-v8a`** *(Recommended)*  For 99% of modern Android phones.
+            *   **`armeabi-v7a`** 👉 For older, 32-bit Android phones.
+            *   **`x86_64`** 👉 For modern Android Emulators.
+            *   **`x86`** 👉 For older Android Emulators.
