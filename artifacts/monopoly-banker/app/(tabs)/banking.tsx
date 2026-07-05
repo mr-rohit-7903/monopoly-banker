@@ -296,7 +296,7 @@ export default function BankingScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
           <Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>Select a player then tap an action</Text>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.playerRow}>
+          <View style={styles.playerRow}>
             {players.map(p => {
               const sel = quickPlayerId === p.id;
               return (
@@ -309,11 +309,11 @@ export default function BankingScreen() {
                   ]}
                 >
                   <View style={[styles.dot, { backgroundColor: p.color }]} />
-                  <Text style={[styles.playerChipText, { color: sel ? p.color : colors.foreground }]} numberOfLines={1}>{p.name}</Text>
+                  <Text style={[styles.playerChipText, { color: sel ? p.color : colors.foreground }]}>{p.name}</Text>
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
 
           <View style={styles.quickGrid}>
             {([
@@ -362,7 +362,7 @@ export default function BankingScreen() {
           </Text>
 
           {/* Player selector */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.playerRow}>
+          <View style={styles.playerRow}>
             {players.length === 0 && (
               <Text style={[styles.noPlayersHint, { color: colors.mutedForeground }]}>No players yet</Text>
             )}
@@ -378,11 +378,11 @@ export default function BankingScreen() {
                   ]}
                 >
                   <View style={[styles.dot, { backgroundColor: p.color }]} />
-                  <Text style={[styles.playerChipText, { color: sel ? p.color : colors.foreground }]} numberOfLines={1}>{p.name}</Text>
+                  <Text style={[styles.playerChipText, { color: sel ? p.color : colors.foreground }]}>{p.name}</Text>
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
 
           {/* Deck buttons */}
           <View style={styles.deckRow}>
@@ -470,13 +470,13 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16 },
 
-  playerRow: { flexDirection: 'row', gap: 8 },
+  playerRow: { flexDirection: 'column', gap: 8 },
   playerChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5,
   },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  playerChipText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, maxWidth: 80 },
+  dot: { width: 12, height: 12, borderRadius: 6 },
+  playerChipText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, flex: 1 },
   noPlayersHint: { fontFamily: 'Inter_400Regular', fontSize: 14, paddingVertical: 8 },
 
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

@@ -25,7 +25,7 @@ export function PlayerSelector({ players, selectedId, onSelect, includeBank = tr
       {label && (
         <Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>
       )}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      <View style={styles.row}>
         {items.map(item => {
           const isSelected = item.id === selectedId;
           return (
@@ -42,13 +42,13 @@ export function PlayerSelector({ players, selectedId, onSelect, includeBank = tr
               ]}
             >
               <PlayerAvatar name={item.name} color={item.color} size={36} />
-              <Text style={[styles.name, { color: isSelected ? colors.primary : colors.foreground }]} numberOfLines={1}>
+              <Text style={[styles.name, { color: isSelected ? colors.primary : colors.foreground }]}>
                 {item.name}
               </Text>
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -63,22 +63,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   row: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 8,
     paddingBottom: 4,
   },
   item: {
+    flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 1.5,
-    gap: 6,
-    minWidth: 70,
+    gap: 12,
   },
   name: {
     fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    textAlign: 'center',
+    fontSize: 14,
+    flex: 1,
   },
 });

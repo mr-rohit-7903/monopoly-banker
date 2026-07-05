@@ -136,7 +136,7 @@ function PropertyDetailModal({
                     </View>
                   </View>
                 ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownerRow}>
+                  <View style={styles.ownerRow}>
                     {players.map(p => {
                       return (
                         <Pressable
@@ -153,8 +153,8 @@ function PropertyDetailModal({
                             },
                           ]}
                         >
-                          <PlayerAvatar name={p.name} color={p.color} size={22} />
-                          <View>
+                          <PlayerAvatar name={p.name} color={p.color} size={28} />
+                          <View style={{ flex: 1 }}>
                             <Text style={[styles.buyChipName, { color: colors.foreground }]}>{p.name}</Text>
                             <Text style={[styles.buyChipBalance, { color: colors.mutedForeground }]}>
                               {formatMoney(p.balance, currency)}
@@ -163,7 +163,7 @@ function PropertyDetailModal({
                         </Pressable>
                       );
                     })}
-                  </ScrollView>
+                  </View>
                 )}
               </>
             )}
@@ -372,13 +372,13 @@ const styles = StyleSheet.create({
   },
   tradeHintText: { fontFamily: 'Inter_400Regular', fontSize: 12, flex: 1, lineHeight: 17 },
   // Unowned — buy chips
-  ownerRow: { flexDirection: 'row', gap: 8 },
+  ownerRow: { flexDirection: 'column', gap: 8 },
   buyChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5,
   },
-  buyChipName: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
-  buyChipBalance: { fontFamily: 'Inter_400Regular', fontSize: 11 },
+  buyChipName: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
+  buyChipBalance: { fontFamily: 'Inter_400Regular', fontSize: 12 },
   // Buy confirmation
   confirmCard: {
     borderRadius: 14, borderWidth: 1, padding: 16, gap: 14,
