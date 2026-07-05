@@ -10,6 +10,7 @@ import { useGameStore, Player } from '@/store/gameStore';
 import { PROPERTY_GROUPS, GROUP_NAMES, MonopolyProperty, GROUP_COLORS } from '@/constants/monopoly';
 import { useProperties } from '@/hooks/useProperties';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
+import { AmountInput } from '@/components/AmountInput';
 import { formatMoney } from '@/utils/format';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,19 +25,21 @@ function PropertyDetailModal({
 
   // Buy confirmation state
   const [buyTarget, setBuyTarget] = useState<Player | null>(null);
+  const [buyPriceStr, setBuyPriceStr] = useState('');
 
   if (!property || !ownership) return null;
   const owner = ownership.ownerId ? players.find(p => p.id === ownership.ownerId) : null;
 
-  function handleConfirmBuy() {
+  function handleConfirmBuy(amount: number) {
     if (!buyTarget || !property) return;
-    assignProperty(property.id, buyTarget.id, property.price);
+    assignProperty(property.id, buyTarget.id, amount);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setBuyTarget(null);
   }
 
   function handleClose() {
     setBuyTarget(null);
+    setBuyPriceStr('');
     onClose();
   }
 
@@ -89,10 +92,17 @@ function PropertyDetailModal({
                           {buyTarget.name} buys {property.name}?
                         </Text>
                         <Text style={[styles.confirmSub, { color: colors.mutedForeground }]}>
-                          {formatMoney(property.price, currency)} will be deducted from their balance
+                          Base price: {formatMoney(property.price, currency)}
                         </Text>
                       </View>
                     </View>
+
+                    <AmountInput
+                      value={buyPriceStr}
+                      onChange={setBuyPriceStr}
+                      label="Purchase Price (Auction / Base)"
+                    />
+
                     <View style={styles.confirmBtns}>
                       <Pressable
                         onPress={() => setBuyTarget(null)}
@@ -104,40 +114,49 @@ function PropertyDetailModal({
                         <Text style={[styles.confirmCancelText, { color: colors.foreground }]}>Cancel</Text>
                       </Pressable>
                       <Pressable
-                        onPress={handleConfirmBuy}
-                        style={({ pressed }) => [
-                          styles.confirmBuy,
-                          { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 },
-                        ]}
+                        onPress={() => {
+                          const amt = parseInt(buyPriceStr) || 0;
+                          if (amt > buyTarget.balance) {
+                            Alert.alert('Low Balance', `${buyTarget.name} does not have enough money.`);
+                            return;
+                          }
+                          handleConfirmBuy(amt);
+                        }}
+                        style={({ pressed }) => {
+                          const amt = parseInt(buyPriceStr) || 0;
+                          const canAfford = amt <= buyTarget.balance;
+                          return [
+                            styles.confirmBuy,
+                            { backgroundColor: canAfford ? colors.primary : colors.muted, opacity: pressed ? 0.8 : 1 },
+                          ];
+                        }}
                       >
-                        <Text style={styles.confirmBuyText}>Buy {formatMoney(property.price, currency)}</Text>
+                        <Text style={styles.confirmBuyText}>Buy</Text>
                       </Pressable>
                     </View>
                   </View>
                 ) : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownerRow}>
                     {players.map(p => {
-                      const canAfford = p.balance >= property.price;
                       return (
                         <Pressable
                           key={p.id}
                           onPress={() => {
-                            if (!canAfford) return;
                             setBuyTarget(p);
+                            setBuyPriceStr(property.price.toString());
                           }}
                           style={[
                             styles.buyChip,
                             {
                               backgroundColor: colors.muted,
-                              borderColor: canAfford ? colors.border : colors.destructive + '44',
-                              opacity: canAfford ? 1 : 0.5,
+                              borderColor: colors.border,
                             },
                           ]}
                         >
                           <PlayerAvatar name={p.name} color={p.color} size={22} />
                           <View>
                             <Text style={[styles.buyChipName, { color: colors.foreground }]}>{p.name}</Text>
-                            <Text style={[styles.buyChipBalance, { color: canAfford ? colors.mutedForeground : colors.destructive }]}>
+                            <Text style={[styles.buyChipBalance, { color: colors.mutedForeground }]}>
                               {formatMoney(p.balance, currency)}
                             </Text>
                           </View>
