@@ -63,6 +63,6 @@ jobs:
             
             **Which one should I download?**
             *   **`arm64-v8a`** *(Recommended)*  For 99% of modern Android phones.
-            *   **`armeabi-v7a`** 👉 For older, 32-bit Android phones.
-            *   **`x86_64`** 👉 For modern Android Emulators.
-            *   **`x86`** 👉 For older Android Emulators.
+            *   **`armeabi-v7a`**  For older, 32-bit Android phones.
+            *   **`x86_64`**  For modern Android Emulators.
+            *   **`x86`**  For older Android Emulators.
