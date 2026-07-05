@@ -44,18 +44,39 @@ jobs:
       - name: Build APK
         run: eas build --platform android --profile preview --non-interactive --local
 
+      - name: Extract and Rename APKs
+        run: |
+          # If EAS packed multiple APKs into a tarball, extract it
+          if ls build-*.tar.gz 1> /dev/null 2>&1; then
+            tar -xzf build-*.tar.gz
+            rm build-*.tar.gz
+          fi
+          
+          # Rename any generated APKs to have clean, readable names
+          for file in *.apk **/*.apk; do
+            if [[ -f "$file" ]]; then
+              for arch in arm64-v8a armeabi-v7a x86_64 x86 universal; do
+                if [[ "$file" == *"$arch"* ]]; then
+                  mv "$file" "monopoly-banker-$arch.apk"
+                  break
+                fi
+              done
+            fi
+          done
+        working-directory: artifacts/monopoly-banker
+        
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: monopoly-banker-apk
-          path: artifacts/monopoly-banker/build-*.apk
+          path: artifacts/monopoly-banker/monopoly-banker-*.apk
           retention-days: 30
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: artifacts/monopoly-banker/build-*.apk
+          files: artifacts/monopoly-banker/monopoly-banker-*.apk
           body: |
             ### Monopoly Banker Release 
             
