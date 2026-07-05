@@ -48,7 +48,7 @@ export const GROUP_NAMES: Record<PropertyGroup, string> = {
 
 import { VERSIONS } from './versions';
 
-export const MONOPOLY_PROPERTIES: MonopolyProperty[] = VERSIONS.US;
+export const MONOPOLY_PROPERTIES: MonopolyProperty[] = VERSIONS.US.properties;
 
 // Standard US Monopoly starting money: 2 x $500, 2 x $100, 2 x $50, 6 x $20, 5 x $10, 5 x $5, 5 x $1
 export const STANDARD_STARTING_MONEY = 1500;
@@ -62,5 +62,5 @@ export const PROPERTY_GROUPS: PropertyGroup[] = [
 ];
 
 export function getProperties(version: string): MonopolyProperty[] {
-  return VERSIONS[version] || VERSIONS.US;
+  return (VERSIONS[version] || VERSIONS.US).properties;
 }

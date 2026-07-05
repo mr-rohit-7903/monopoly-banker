@@ -11,7 +11,8 @@ import { useGameStore } from '@/store/gameStore';
 import { PlayerSelector } from '@/components/PlayerSelector';
 import { AmountInput } from '@/components/AmountInput';
 import { CardDrawModal, CHANCE_COLOR, COMMUNITY_COLOR } from '@/components/CardDrawModal';
-import { CHANCE_CARDS, COMMUNITY_CHEST_CARDS, MonopolyCard } from '@/constants/cards';
+import { MonopolyCard } from '@/constants/cards';
+import { useCards } from '@/hooks/useCards';
 import { formatMoney } from '@/utils/format';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,6 +24,7 @@ export default function BankingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players).filter(p => !p.isBankrupt);
+  const { chanceCards, communityChestCards } = useCards();
   const settings = useGameStore(s => s.settings);
   const { transfer, collectSalary, payJailFine, useJailCard } = useGameStore();
 
@@ -102,7 +104,7 @@ export default function BankingScreen() {
   // ── Card draw ─────────────────────────────────────────────────────────────
   function handleDraw(deck: 'chance' | 'community') {
     if (!cardDrawerId) { setAlertModal({ title: 'Select a Player', message: 'Tap a player above then draw a card.' }); return; }
-    const card = pickRandom(deck === 'chance' ? CHANCE_CARDS : COMMUNITY_CHEST_CARDS);
+    const card = pickRandom(deck === 'chance' ? chanceCards : communityChestCards);
     setDrawnCard(card);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
   }
