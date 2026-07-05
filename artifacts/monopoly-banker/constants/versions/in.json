@@ -463,8 +463,8 @@
       "id": "ch_illinois",
       "deck": "chance",
       "emoji": "🚗",
-      "title": "Advance to Illinois Avenue",
-      "description": "Move your token to Illinois Ave. If you pass GO, collect ₹200.",
+      "title": "Advance to Lucknow",
+      "description": "Move your token to Lucknow. If you pass GO, collect ₹200.",
       "action": "display",
       "hasGoBonus": true
     },
@@ -472,8 +472,8 @@
       "id": "ch_stcharles",
       "deck": "chance",
       "emoji": "🚗",
-      "title": "Advance to St. Charles Place",
-      "description": "Move your token to St. Charles Place. If you pass GO, collect ₹200.",
+      "title": "Advance to Bhopal",
+      "description": "Move your token to Bhopal. If you pass GO, collect ₹200.",
       "action": "display",
       "hasGoBonus": true
     },
@@ -505,8 +505,8 @@
       "id": "ch_reading",
       "deck": "chance",
       "emoji": "🚂",
-      "title": "Advance to Reading Railroad",
-      "description": "Move your token directly to Reading Railroad. If you pass GO, collect ₹200.",
+      "title": "Advance to Chhatrapati Shivaji Terminus",
+      "description": "Move your token directly to Chhatrapati Shivaji Terminus. If you pass GO, collect ₹200.",
       "action": "display",
       "hasGoBonus": true
     },
@@ -514,8 +514,8 @@
       "id": "ch_boardwalk",
       "deck": "chance",
       "emoji": "🏖️",
-      "title": "Advance to Boardwalk",
-      "description": "Move your token directly to Boardwalk.",
+      "title": "Advance to Mumbai",
+      "description": "Move your token directly to Mumbai.",
       "action": "display"
     },
     {
@@ -575,8 +575,8 @@
       "id": "ch_reading2",
       "deck": "chance",
       "emoji": "🚂",
-      "title": "Take a Trip to Reading Railroad",
-      "description": "Move your token to Reading Railroad. If you pass GO, collect ₹200.",
+      "title": "Take a Trip to Chhatrapati Shivaji Terminus",
+      "description": "Move your token to Chhatrapati Shivaji Terminus. If you pass GO, collect ₹200.",
       "action": "display",
       "hasGoBonus": true
     },
