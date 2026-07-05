@@ -8,12 +8,14 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useGameStore, Player } from '@/store/gameStore';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
-import { MONOPOLY_PROPERTIES, GROUP_NAMES, type PropertyGroup } from '@/constants/monopoly';
+import { GROUP_NAMES, type PropertyGroup } from '@/constants/monopoly';
+import { useProperties } from '@/hooks/useProperties';
 import { formatMoney } from '@/utils/format';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TradeScreen() {
   const palette = useColors();
+  const properties = useProperties();
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players).filter(p => !p.isBankrupt);
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
@@ -40,11 +42,11 @@ export default function TradeScreen() {
 
   // Properties owned by each player
   const propsOwnedByA = useMemo(() =>
-    playerA ? MONOPOLY_PROPERTIES.filter(p => propertyOwnerships[p.id]?.ownerId === playerA.id) : [],
+    playerA ? properties.filter(p => propertyOwnerships[p.id]?.ownerId === playerA.id) : [],
     [playerA, propertyOwnerships]
   );
   const propsOwnedByB = useMemo(() =>
-    playerB ? MONOPOLY_PROPERTIES.filter(p => propertyOwnerships[p.id]?.ownerId === playerB.id) : [],
+    playerB ? properties.filter(p => propertyOwnerships[p.id]?.ownerId === playerB.id) : [],
     [playerB, propertyOwnerships]
   );
 
@@ -336,7 +338,7 @@ function TradeSide({ player, otherPlayer, money, onMoneyChange, selectedProps, o
   money: string;
   onMoneyChange: (v: string) => void;
   selectedProps: string[];
-  ownedProps: typeof MONOPOLY_PROPERTIES;
+  ownedProps: ReturnType<typeof useProperties>;
   onToggleProp: (id: string) => void;
   palette: ReturnType<typeof useColors>;
   currency: string;

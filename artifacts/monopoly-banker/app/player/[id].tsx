@@ -12,13 +12,15 @@ import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { TransactionItem } from '@/components/TransactionItem';
 import { formatMoney } from '@/utils/format';
 import colorConstants from '@/constants/colors';
-import { MONOPOLY_PROPERTIES, GROUP_NAMES } from '@/constants/monopoly';
+import { GROUP_NAMES } from '@/constants/monopoly';
+import { useProperties } from '@/hooks/useProperties';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PLAYER_COLORS = colorConstants.playerColors;
 
 export default function PlayerDetailScreen() {
   const palette = useColors();
+  const properties = useProperties();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -53,7 +55,7 @@ export default function PlayerDetailScreen() {
     .filter(t => t.fromId === player.id || t.toId === player.id);
 
   // Get properties owned by this player
-  const ownedProperties = MONOPOLY_PROPERTIES.filter(
+  const ownedProperties = properties.filter(
     p => propertyOwnerships[p.id]?.ownerId === player.id
   );
 

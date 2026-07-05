@@ -7,7 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useGameStore, Player } from '@/store/gameStore';
-import { MONOPOLY_PROPERTIES, PROPERTY_GROUPS, GROUP_NAMES, MonopolyProperty, GROUP_COLORS } from '@/constants/monopoly';
+import { PROPERTY_GROUPS, GROUP_NAMES, MonopolyProperty, GROUP_COLORS } from '@/constants/monopoly';
+import { useProperties } from '@/hooks/useProperties';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { formatMoney } from '@/utils/format';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -224,6 +225,7 @@ function PropertyDetailModal({
 
 export default function PropertiesScreen() {
   const colors = useColors();
+  const properties = useProperties();
   const insets = useSafeAreaInsets();
   const [selectedProperty, setSelectedProperty] = useState<MonopolyProperty | null>(null);
 
@@ -251,7 +253,7 @@ export default function PropertiesScreen() {
         showsVerticalScrollIndicator={false}
       >
         {PROPERTY_GROUPS.map(group => {
-          const props = MONOPOLY_PROPERTIES.filter(p => p.group === group);
+          const props = properties.filter(p => p.group === group);
           return (
             <View key={group} style={styles.groupSection}>
               <View style={styles.groupHeader}>

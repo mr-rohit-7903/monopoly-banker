@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MONOPOLY_PROPERTIES, STANDARD_STARTING_MONEY, SALARY_AMOUNT, INCOME_TAX_AMOUNT, LUXURY_TAX_AMOUNT } from '@/constants/monopoly';
+import { MONOPOLY_PROPERTIES, getProperties, STANDARD_STARTING_MONEY, SALARY_AMOUNT, INCOME_TAX_AMOUNT, LUXURY_TAX_AMOUNT } from '@/constants/monopoly';
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -49,6 +49,7 @@ export interface PropertyOwnership {
 export interface GameSettings {
   startingMoney: number;
   currency: string;
+  version: 'US' | 'IN';
   darkMode: 'light' | 'dark' | 'system';
   salaryAmount: number;
   incomeTaxAmount: number;
@@ -58,6 +59,7 @@ export interface GameSettings {
 const DEFAULT_SETTINGS: GameSettings = {
   startingMoney: STANDARD_STARTING_MONEY,
   currency: '$',
+  version: 'US',
   darkMode: 'system',
   salaryAmount: SALARY_AMOUNT,
   incomeTaxAmount: INCOME_TAX_AMOUNT,
@@ -295,16 +297,18 @@ export const useGameStore = create<GameState>()(
           const buyer = state.players.find(p => p.id === ownerId);
           if (!buyer || buyer.balance < price) return state;
           players = players.map(p => p.id === ownerId ? { ...p, balance: p.balance - price } : p);
+          const propName = getProperties(state.settings.version).find(p => p.id === propertyId)?.name;
           transactions.push({
             id: genId(), type: 'property_buy', fromId: ownerId, toId: null,
-            amount: price, description: `Bought ${MONOPOLY_PROPERTIES.find(p => p.id === propertyId)?.name}`,
+            amount: price, description: `Bought ${propName}`,
             timestamp: Date.now(), propertyId, prevOwnerId,
           });
         } else if (ownerId !== null && price === 0 && prevOwnerId !== null) {
           // Player-to-player trade (no money changes hands)
+          const propName = getProperties(state.settings.version).find(p => p.id === propertyId)?.name;
           transactions.push({
             id: genId(), type: 'property_buy', fromId: ownerId, toId: null,
-            amount: 0, description: `Traded ${MONOPOLY_PROPERTIES.find(p => p.id === propertyId)?.name}`,
+            amount: 0, description: `Traded ${propName}`,
             timestamp: Date.now(), propertyId, prevOwnerId,
           });
         }
@@ -329,7 +333,7 @@ export const useGameStore = create<GameState>()(
 
       toggleMortgage: (propertyId) => set(state => {
         const ownership = state.propertyOwnerships[propertyId];
-        const property = MONOPOLY_PROPERTIES.find(p => p.id === propertyId);
+        const property = getProperties(state.settings.version).find(p => p.id === propertyId);
         if (!property || !ownership?.ownerId) return state;
 
         const isMortgaging = !ownership.isMortgaged;
@@ -393,8 +397,9 @@ export const useGameStore = create<GameState>()(
         const parts: string[] = [];
         if (moneyAtoB > 0) parts.push(`${playerA.name} pays ${state.settings.currency}${moneyAtoB}`);
         if (moneyBtoA > 0) parts.push(`${playerB.name} pays ${state.settings.currency}${moneyBtoA}`);
+        const props = getProperties(state.settings.version);
         const propNames = (ids: string[]) =>
-          ids.map(id => MONOPOLY_PROPERTIES.find(p => p.id === id)?.name ?? id).join(', ');
+          ids.map(id => props.find(p => p.id === id)?.name ?? id).join(', ');
         if (propsAtoB.length > 0) parts.push(`${playerA.name} gives ${propNames(propsAtoB)}`);
         if (propsBtoA.length > 0) parts.push(`${playerB.name} gives ${propNames(propsBtoA)}`);
         const description = `Trade: ${parts.join(' · ')}`;
@@ -448,9 +453,13 @@ export const useGameStore = create<GameState>()(
         gameStartTime: Date.now(),
       })),
 
-      updateSettings: (updates) => set(state => ({
-        settings: { ...state.settings, ...updates },
-      })),
+      updateSettings: (updates) => set(state => {
+        const newSettings = { ...state.settings, ...updates };
+        if (updates.version) {
+          newSettings.currency = updates.version === 'IN' ? '₹' : '$';
+        }
+        return { settings: newSettings };
+      }),
     }),
     {
       name: 'monopoly-banker-v5',

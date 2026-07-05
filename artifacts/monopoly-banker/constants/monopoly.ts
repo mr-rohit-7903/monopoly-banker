@@ -181,3 +181,61 @@ export const LUXURY_TAX_AMOUNT = 100;
 export const PROPERTY_GROUPS: PropertyGroup[] = [
   'brown', 'lightblue', 'pink', 'orange', 'red', 'yellow', 'green', 'darkblue', 'railroad', 'utility',
 ];
+
+const IN_OVERRIDES: Record<string, { name: string; price: number }> = {
+  // Brown
+  'mediterranean': { name: 'Agra', price: 100 },
+  'baltic': { name: 'Panaji (Goa)', price: 100 },
+  // Light Blue
+  'oriental': { name: 'Vadodara', price: 140 },
+  'vermont': { name: 'Bhubaneswar', price: 160 },
+  'connecticut': { name: 'Guwahati', price: 180 },
+  // Pink
+  'stcharles': { name: 'Bhopal', price: 140 },
+  'states': { name: 'Patna', price: 140 },
+  'virginia': { name: 'Ludhiana', price: 140 },
+  // Orange
+  'stjames': { name: 'Nagpur', price: 180 },
+  'tennessee': { name: 'Indore', price: 180 },
+  'newyork': { name: 'Kochi', price: 180 },
+  // Red
+  'kentucky': { name: 'Jaipur', price: 240 },
+  'indiana': { name: 'Chandigarh', price: 220 },
+  'illinois': { name: 'Lucknow', price: 220 },
+  // Yellow
+  'atlantic': { name: 'Pune', price: 260 },
+  'ventnor': { name: 'Ahmedabad', price: 280 },
+  'marvingardens': { name: 'Hyderabad', price: 260 },
+  // Green
+  'pacific': { name: 'Kolkata', price: 300 },
+  'northcarolina': { name: 'Bengaluru', price: 320 },
+  'pennsylvania': { name: 'Delhi', price: 350 },
+  // Dark Blue
+  'parkplace': { name: 'Chennai', price: 300 },
+  'boardwalk': { name: 'Mumbai', price: 400 },
+  // Railroads
+  'reading': { name: 'Chhatrapati Shivaji Terminus', price: 200 },
+  'pennsylvaniarr': { name: 'New Delhi', price: 200 },
+  'bando': { name: 'Howrah', price: 200 },
+  'shortline': { name: 'Chennai Central', price: 200 },
+  // Utilities
+  'electric': { name: 'Electric Company', price: 150 },
+  'waterworks': { name: 'Water Works', price: 150 },
+};
+
+export function getProperties(version: 'US' | 'IN'): MonopolyProperty[] {
+  if (version === 'US') return MONOPOLY_PROPERTIES;
+  
+  return MONOPOLY_PROPERTIES.map(p => {
+    const override = IN_OVERRIDES[p.id];
+    if (override) {
+      return {
+        ...p,
+        name: override.name,
+        price: override.price,
+        mortgage: override.price / 2,
+      };
+    }
+    return p;
+  });
+}

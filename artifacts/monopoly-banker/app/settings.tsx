@@ -50,13 +50,9 @@ export default function SettingsScreen() {
     { value: 'dark', label: 'Dark' },
   ];
 
-  const CURRENCIES = [
-    { value: '$', label: '$ USD' },
-    { value: '€', label: '€ EUR' },
-    { value: '£', label: '£ GBP' },
-    { value: '¥', label: '¥ JPY' },
-    { value: '₹', label: '₹ INR' },
-    { value: 'M', label: 'M Monopoly' },
+  const VERSIONS = [
+    { value: 'US', label: 'US ($)' },
+    { value: 'IN', label: 'India (₹)' },
   ];
 
   function NumInput({ value, onChange, onBlur }: { value: string; onChange: (v: string) => void; onBlur?: () => void }) {
@@ -148,22 +144,22 @@ export default function SettingsScreen() {
               ))}
             </View>
           </SettingRow>
-          <SettingRow label="Currency" last>
+          <SettingRow label="Version" last>
             <View style={styles.chipRow}>
-              {CURRENCIES.map(c => (
+              {VERSIONS.map(v => (
                 <Pressable
-                  key={c.value}
-                  onPress={() => updateSettings({ currency: c.value })}
+                  key={v.value}
+                  onPress={() => updateSettings({ version: v.value as 'US' | 'IN' })}
                   style={[
                     styles.chip,
                     {
-                      backgroundColor: settings.currency === c.value ? palette.primary + '22' : palette.muted,
-                      borderColor: settings.currency === c.value ? palette.primary : palette.border,
+                      backgroundColor: settings.version === v.value ? palette.primary + '22' : palette.muted,
+                      borderColor: settings.version === v.value ? palette.primary : palette.border,
                     },
                   ]}
                 >
-                  <Text style={[styles.chipText, { color: settings.currency === c.value ? palette.primary : palette.foreground }]}>
-                    {c.label}
+                  <Text style={[styles.chipText, { color: settings.version === v.value ? palette.primary : palette.foreground }]}>
+                    {v.label}
                   </Text>
                 </Pressable>
               ))}

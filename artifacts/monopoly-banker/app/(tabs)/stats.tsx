@@ -6,11 +6,12 @@ import { useGameStore } from '@/store/gameStore';
 import { StatCard } from '@/components/StatCard';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { formatMoney, formatDuration } from '@/utils/format';
-import { MONOPOLY_PROPERTIES } from '@/constants/monopoly';
+import { useProperties } from '@/hooks/useProperties';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function StatsScreen() {
   const colors = useColors();
+  const properties = useProperties();
   const insets = useSafeAreaInsets();
   const players = useGameStore(s => s.players);
 
@@ -38,7 +39,7 @@ export default function StatsScreen() {
     netWorth: p.balance + Object.entries(propertyOwnerships)
       .filter(([, o]) => o.ownerId === p.id)
       .reduce((sum, [id]) => {
-        const prop = MONOPOLY_PROPERTIES.find(pp => pp.id === id);
+        const prop = properties.find(pp => pp.id === id);
         return sum + (prop?.price ?? 0);
       }, 0),
   })).sort((a, b) => b.netWorth - a.netWorth);
@@ -117,7 +118,7 @@ export default function StatsScreen() {
             <View style={styles.grid}>
               <StatCard
                 label="Properties Sold"
-                value={`${ownedProperties} / ${MONOPOLY_PROPERTIES.length}`}
+                value={`${ownedProperties} / ${properties.length}`}
                 icon="home-group"
               />
             </View>
