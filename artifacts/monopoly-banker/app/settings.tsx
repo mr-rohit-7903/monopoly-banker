@@ -29,6 +29,8 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const settings = useGameStore(s => s.settings);
+  const transactions = useGameStore(s => s.transactions);
+  const gameStarted = transactions.length > 0;
   const { updateSettings, resetGame } = useGameStore();
   const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
@@ -149,12 +151,14 @@ export default function SettingsScreen() {
               {VERSIONS.map(v => (
                 <Pressable
                   key={v.value}
+                  disabled={gameStarted}
                   onPress={() => updateSettings({ version: v.value as 'US' | 'IN' })}
                   style={[
                     styles.chip,
                     {
                       backgroundColor: settings.version === v.value ? palette.primary + '22' : palette.muted,
                       borderColor: settings.version === v.value ? palette.primary : palette.border,
+                      opacity: gameStarted && settings.version !== v.value ? 0.3 : 1,
                     },
                   ]}
                 >
