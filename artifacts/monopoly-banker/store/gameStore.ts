@@ -23,6 +23,7 @@ export type TransactionType =
   | 'property_buy' | 'property_sell'
   | 'chance_card' | 'community_card'
   | 'jail_fine' | 'jail_card'
+  | 'free_parking'
   | 'trade';
 
 export interface Transaction {
@@ -114,6 +115,19 @@ interface GameState {
   resetGame: () => void;
   restartGame: () => void;
   updateSettings: (updates: Partial<GameSettings>) => void;
+  claimFreeParking: (playerId: string) => boolean;
+}
+
+export function calculateFreeParkingPot(transactions: Transaction[]): number {
+  return transactions.reduce((sum, t) => {
+    if (t.toId === null && t.fromId !== null && ['income_tax', 'luxury_tax', 'chance_card', 'community_card', 'jail_fine', 'bank_receive'].includes(t.type)) {
+      return sum + t.amount;
+    }
+    if (t.type === 'free_parking' && t.fromId === null && t.toId !== null) {
+      return sum - t.amount;
+    }
+    return sum;
+  }, 0);
 }
 
 export const useGameStore = create<GameState>()(
@@ -460,6 +474,27 @@ export const useGameStore = create<GameState>()(
         }
         return { settings: newSettings };
       }),
+
+      claimFreeParking: (playerId) => {
+        const state = get();
+        const pot = calculateFreeParkingPot(state.transactions);
+        if (pot <= 0) return false;
+        
+        const player = state.players.find(p => p.id === playerId);
+        if (!player || player.isBankrupt) return false;
+        
+        set(state => ({
+          players: state.players.map(p => p.id === playerId ? { ...p, balance: p.balance + pot } : p),
+          transactions: [...state.transactions, {
+            id: genId(), type: 'free_parking',
+            fromId: null, toId: playerId,
+            amount: pot,
+            description: `Claimed Free Parking Pot (${state.settings.currency}${pot})`,
+            timestamp: Date.now(),
+          }],
+        }));
+        return true;
+      },
     }),
     {
       name: 'monopoly-banker-v5',

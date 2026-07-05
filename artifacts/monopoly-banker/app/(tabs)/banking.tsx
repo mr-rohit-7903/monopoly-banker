@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
-import { useGameStore } from '@/store/gameStore';
+import { useGameStore, calculateFreeParkingPot } from '@/store/gameStore';
 import { PlayerSelector } from '@/components/PlayerSelector';
 import { AmountInput } from '@/components/AmountInput';
 import { CardDrawModal, CHANCE_COLOR, COMMUNITY_COLOR } from '@/components/CardDrawModal';
@@ -26,7 +26,9 @@ export default function BankingScreen() {
   const players = useGameStore(s => s.players).filter(p => !p.isBankrupt);
   const { chanceCards, communityChestCards } = useCards();
   const settings = useGameStore(s => s.settings);
-  const { transfer, collectSalary, payJailFine, useJailCard } = useGameStore();
+  const { transfer, collectSalary, payJailFine, useJailCard, claimFreeParking } = useGameStore();
+  const transactions = useGameStore(s => s.transactions);
+  const pot = calculateFreeParkingPot(transactions);
 
   // Transfer state
   const [fromId, setFromId] = useState<string | null>(null);
@@ -81,6 +83,14 @@ export default function BankingScreen() {
       collectSalary(quickPlayerId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showConfirm('🏁', 'Salary Collected', `${playerName} received ${formatMoney(settings.salaryAmount, settings.currency)} from the bank`);
+    } else if (action === 'freeparking') {
+      if (pot <= 0) { setAlertModal({ title: 'Empty Pot', message: 'The Free Parking pot is currently empty.' }); return; }
+      const claimedAmount = pot;
+      const ok = claimFreeParking(quickPlayerId);
+      if (ok) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showConfirm('🎉', 'Free Parking Claimed', `${playerName} won the pot of ${formatMoney(claimedAmount, settings.currency)}!`);
+      }
     } else {
       const amt  = action === 'income' ? settings.incomeTaxAmount : settings.luxuryTaxAmount;
       const type = action === 'income' ? 'income_tax' : ('luxury_tax' as const);
@@ -304,6 +314,7 @@ export default function BankingScreen() {
               { label: 'Collect Salary', sub: `+${formatMoney(settings.salaryAmount, settings.currency)}`, icon: 'cash-plus' as const, color: colors.success, action: () => handleQuick('salary') },
               { label: 'Income Tax',     sub: `-${formatMoney(settings.incomeTaxAmount, settings.currency)}`, icon: 'file-document' as const, color: colors.warning, action: () => handleQuick('income') },
               { label: 'Luxury Tax',     sub: `-${formatMoney(settings.luxuryTaxAmount, settings.currency)}`, icon: 'diamond' as const, color: colors.destructive, action: () => handleQuick('luxury') },
+              { label: 'Free Parking',   sub: `Claim ${formatMoney(pot, settings.currency)}`, icon: 'parking' as const, color: '#9C27B0', action: () => handleQuick('freeparking') },
             ] as const).map(item => (
               <Pressable
                 key={item.label}
