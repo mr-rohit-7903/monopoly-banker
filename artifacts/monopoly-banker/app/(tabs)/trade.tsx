@@ -20,6 +20,7 @@ export default function TradeScreen() {
   const players = useGameStore(s => s.players).filter(p => !p.isBankrupt);
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
   const currency = useGameStore(s => s.settings.currency);
+  const version = useGameStore(s => s.settings.version);
   const executeTrade = useGameStore(s => s.executeTrade);
 
   const topPad = Platform.OS === 'web' ? 16 : insets.top;
@@ -347,6 +348,7 @@ function TradeSide({ player, otherPlayer, money, onMoneyChange, selectedProps, o
   currency: string;
   propertyOwnerships: Record<string, { ownerId: string | null; isMortgaged: boolean; houses: number; hotel: boolean }>;
 }) {
+  const version = useGameStore(s => s.settings.version);
   return (
     <View style={[styles.offerCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
       {/* Color strip */}
@@ -395,12 +397,14 @@ function TradeSide({ player, otherPlayer, money, onMoneyChange, selectedProps, o
                 const selected = selectedProps.includes(prop.id);
                 const mortgaged = propertyOwnerships[prop.id]?.isMortgaged;
                 
-                // Check if any property in this group has buildings
-                const groupProps = allProps.filter(p => p.group === prop.group);
-                const hasBuildings = groupProps.some(p => {
-                  const own = propertyOwnerships[p.id];
-                  return own && (own.houses > 0 || own.hotel);
-                });
+                // Check if building block applies
+                 const own = propertyOwnerships[prop.id];
+                 const hasBuildings = version === 'INT'
+                   ? (own && (own.houses > 0 || own.hotel))
+                   : allProps.filter(p => p.group === prop.group).some(p => {
+                       const o = propertyOwnerships[p.id];
+                       return o && (o.houses > 0 || o.hotel);
+                     });
 
                 return (
                   <Pressable

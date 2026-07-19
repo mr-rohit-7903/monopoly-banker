@@ -14,13 +14,24 @@ import { AmountInput } from '@/components/AmountInput';
 import { formatMoney } from '@/utils/format';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const INT_PAIRS: Record<string, { partnerId: string; partnerName: string }> = {
+  reading: { partnerId: 'shortline', partnerName: 'Railways' },
+  pennsylvaniarr: { partnerId: 'bando', partnerName: 'Airways' },
+  bando: { partnerId: 'shortline', partnerName: 'Railways' },
+  shortline: { partnerId: 'reading', partnerName: 'Roadways' },
+  electric: { partnerId: 'waterworks', partnerName: 'Waterways' },
+  waterworks: { partnerId: 'electric', partnerName: 'Satellite' },
+};
+
 function PropertyDetailModal({
   property, visible, onClose,
 }: { property: MonopolyProperty | null; visible: boolean; onClose: () => void }) {
   const colors = useColors();
   const players = useGameStore(s => s.players);
-  const ownership = useGameStore(s => property ? s.propertyOwnerships[property.id] : undefined);
+  const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
+  const ownership = property ? propertyOwnerships[property.id] : undefined;
   const currency = useGameStore(s => s.settings.currency);
+  const version = useGameStore(s => s.settings.version);
   const { assignProperty, setHouses, toggleMortgage, transfer } = useGameStore();
   const propertiesList = useProperties();
 
@@ -32,12 +43,65 @@ function PropertyDetailModal({
     });
   });
 
-  // Buy confirmation state
   const [buyTarget, setBuyTarget] = useState<Player | null>(null);
+  const [rentPayer, setRentPayer] = useState<Player | null>(null);
+  const [txConfirm, setTxConfirm] = useState<{ emoji: string; title: string; sub: string } | null>(null);
   const [buyPriceStr, setBuyPriceStr] = useState('');
 
   if (!property || !ownership) return null;
   const owner = ownership.ownerId ? players.find(p => p.id === ownership.ownerId) : null;
+
+  const ownsAllOfGroup = owner ? groupProps.every(
+    p => propertyOwnerships[p.id]?.ownerId === owner.id
+  ) : false;
+
+  const preventMortgage = version === 'INT'
+    ? (ownership ? (ownership.houses > 0 || ownership.hotel) : false)
+    : hasBuildingsInGroup;
+
+  const partnerId = property && version === 'INT' ? INT_PAIRS[property.id]?.partnerId : undefined;
+  const partnerOwnership = partnerId ? propertyOwnerships[partnerId] : undefined;
+  const ownsPartner = owner && partnerOwnership && partnerOwnership.ownerId === owner.id && !partnerOwnership.isMortgaged;
+
+  // Compute active rent
+  const activeRent = (() => {
+    if (!property || !ownership || ownership.isMortgaged || !ownership.ownerId) return 0;
+    if (property.type === 'property') {
+      const showDoubleBase = version === 'INT' && ownsAllOfGroup && !hasBuildingsInGroup;
+      if (ownership.hotel) return property.rentWithHotel;
+      if (ownership.houses === 1) return property.rentWith1;
+      if (ownership.houses === 2) return property.rentWith2;
+      if (ownership.houses === 3) return property.rentWith3;
+      if (ownership.houses === 4) return property.rentWith4 ?? 0;
+      return showDoubleBase ? property.rent * 2 : property.rent;
+    } else if (property.type === 'railroad') {
+      if (version === 'INT') {
+        return ownsPartner ? property.rentWith1 : property.rent;
+      } else {
+        const ownerId = ownership.ownerId;
+        const rrCount = ownerId
+          ? propertiesList.filter(p => p.type === 'railroad' && propertyOwnerships[p.id]?.ownerId === ownerId && !propertyOwnerships[p.id]?.isMortgaged).length
+          : 0;
+        if (rrCount === 1) return property.rent;
+        if (rrCount === 2) return property.rentWith1;
+        if (rrCount === 3) return property.rentWith2;
+        if (rrCount === 4) return property.rentWith3;
+        return 0;
+      }
+    } else { // utility
+      if (version === 'INT') {
+        return ownsPartner ? property.rentWith1 : property.rent;
+      } else {
+        const ownerId = ownership.ownerId;
+        const utilCount = ownerId
+          ? propertiesList.filter(p => p.type === 'utility' && propertyOwnerships[p.id]?.ownerId === ownerId && !propertyOwnerships[p.id]?.isMortgaged).length
+          : 0;
+        if (utilCount === 1) return property.rent;
+        if (utilCount === 2) return property.rentWith1;
+        return 0;
+      }
+    }
+  })();
 
   function handleConfirmBuy(amount: number) {
     if (!buyTarget || !property) return;
@@ -49,6 +113,7 @@ function PropertyDetailModal({
   function handleClose() {
     setBuyTarget(null);
     setBuyPriceStr('');
+    setRentPayer(null);
     onClose();
   }
 
@@ -183,10 +248,6 @@ function PropertyDetailModal({
 
             {/* Houses/Hotels for properties */}
             {property.type === 'property' && owner && (() => {
-              const groupProps = propertiesList.filter(p => p.group === property.group);
-              const ownsAllOfGroup = groupProps.every(
-                p => useGameStore.getState().propertyOwnerships[p.id]?.ownerId === owner.id
-              );
               const isAnyGroupPropertyMortgaged = groupProps.some(
                 p => useGameStore.getState().propertyOwnerships[p.id]?.isMortgaged
               );
@@ -194,7 +255,7 @@ function PropertyDetailModal({
               const getBuildingCount = (propId: string) => {
                 const own = useGameStore.getState().propertyOwnerships[propId];
                 if (!own) return 0;
-                if (own.hotel) return 5;
+                if (own.hotel) return version === 'INT' ? 4 : 5;
                 return own.houses;
               };
 
@@ -208,20 +269,32 @@ function PropertyDetailModal({
               const canAfford = owner.balance >= property.housePrice;
 
               let buyDisableReason = '';
-              if (!ownsAllOfGroup) {
-                buyDisableReason = `Requires all ${GROUP_NAMES[property.group]} properties`;
-              } else if (isAnyGroupPropertyMortgaged) {
-                buyDisableReason = 'Cannot build while a property in group is mortgaged';
-              } else if (currentCount >= 5) {
-                buyDisableReason = 'Maximum buildings reached (Hotel)';
-              } else if (!isEvenBuild) {
-                buyDisableReason = 'Must build evenly (add houses to other properties first)';
-              } else if (!canAfford) {
-                buyDisableReason = `Requires ${formatMoney(property.housePrice, currency)} (Insufficient funds)`;
+              const maxBuildings = version === 'INT' ? 4 : 5;
+
+              if (version === 'INT') {
+                if (ownership.isMortgaged) {
+                  buyDisableReason = 'Cannot build on a mortgaged property';
+                } else if (currentCount >= maxBuildings) {
+                  buyDisableReason = 'Maximum buildings reached (Hotel)';
+                } else if (!canAfford) {
+                  buyDisableReason = `Requires ${formatMoney(property.housePrice, currency)} (Insufficient funds)`;
+                }
+              } else {
+                if (!ownsAllOfGroup) {
+                  buyDisableReason = `Requires all ${GROUP_NAMES[property.group]} properties`;
+                } else if (isAnyGroupPropertyMortgaged) {
+                  buyDisableReason = 'Cannot build while a property in group is mortgaged';
+                } else if (currentCount >= maxBuildings) {
+                  buyDisableReason = 'Maximum buildings reached (Hotel)';
+                } else if (!isEvenBuild) {
+                  buyDisableReason = 'Must build evenly (add houses to other properties first)';
+                } else if (!canAfford) {
+                  buyDisableReason = `Requires ${formatMoney(property.housePrice, currency)} (Insufficient funds)`;
+                }
               }
 
               const canBuild = !buyDisableReason;
-              const isNextHotel = currentCount === 4;
+              const isNextHotel = currentCount === (version === 'INT' ? 3 : 4);
               const buyButtonText = isNextHotel ? `Buy Hotel` : `Buy House`;
 
               const handleBuyHouse = () => {
@@ -240,8 +313,9 @@ function PropertyDetailModal({
 
                 if (success) {
                   const nextCount = currentCount + 1;
-                  const houses = nextCount === 5 ? 0 : nextCount;
-                  const hotel = nextCount === 5;
+                  const targetHotelCount = version === 'INT' ? 4 : 5;
+                  const houses = nextCount === targetHotelCount ? 0 : nextCount;
+                  const hotel = nextCount === targetHotelCount;
                   setHouses(property.id, houses, hotel);
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 } else {
@@ -253,11 +327,11 @@ function PropertyDetailModal({
               let sellDisableReason = '';
               if (currentCount === 0) {
                 sellDisableReason = 'No buildings to sell';
-              } else if (!isEvenSell) {
+              } else if (version !== 'INT' && !isEvenSell) {
                 sellDisableReason = 'Must sell evenly (remove houses from other properties first)';
               }
               const canSell = !sellDisableReason;
-              const isCurrentHotel = currentCount === 5;
+              const isCurrentHotel = ownership.hotel;
               const sellButtonText = isCurrentHotel ? `Sell Hotel` : `Sell House`;
 
               const handleSellHouse = () => {
@@ -360,13 +434,13 @@ function PropertyDetailModal({
               <View style={{ gap: 4 }}>
                 <Pressable
                   onPress={() => { toggleMortgage(property.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
-                  disabled={hasBuildingsInGroup && !ownership.isMortgaged}
+                  disabled={preventMortgage && !ownership.isMortgaged}
                   style={({ pressed }) => [
                     styles.mortgageBtn,
                     {
                       backgroundColor: ownership.isMortgaged ? colors.success + '22' : colors.destructive + '22',
                       borderColor: ownership.isMortgaged ? colors.success : colors.destructive,
-                      opacity: (hasBuildingsInGroup && !ownership.isMortgaged) ? 0.4 : pressed ? 0.8 : 1,
+                      opacity: (preventMortgage && !ownership.isMortgaged) ? 0.4 : pressed ? 0.8 : 1,
                     },
                   ]}
                 >
@@ -376,33 +450,229 @@ function PropertyDetailModal({
                       : `Mortgage (+${formatMoney(property.mortgage, currency)})`}
                   </Text>
                 </Pressable>
-                {hasBuildingsInGroup && !ownership.isMortgaged && (
+                {preventMortgage && !ownership.isMortgaged && (
                   <Text style={[styles.warningText, { color: colors.destructive }]}>
-                    Cannot mortgage while color group has buildings
+                    {version === 'INT' ? 'Cannot mortgage while property has buildings' : 'Cannot mortgage while color group has buildings'}
                   </Text>
+                )}
+              </View>
+            )}
+
+            {/* Pay Rent Section */}
+            {owner && !ownership.isMortgaged && activeRent > 0 && (
+              <View style={{ gap: 8, marginTop: 4 }}>
+                <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Pay Rent</Text>
+                
+                {rentPayer ? (
+                  /* ── Rent Pay Confirmation Card ── */
+                  <View style={[styles.confirmCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <View style={styles.confirmHeader}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <PlayerAvatar name={rentPayer.name} color={rentPayer.color} size={28} />
+                        <MaterialCommunityIcons name="arrow-right-thick" size={18} color={colors.mutedForeground} />
+                        <PlayerAvatar name={owner.name} color={owner.color} size={28} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={[styles.confirmText, { color: colors.foreground }]}>
+                          Pay Rent to {owner.name}?
+                        </Text>
+                        <Text style={[styles.confirmSub, { color: colors.mutedForeground }]}>
+                          Amount: <Text style={{ fontFamily: 'Inter_700Bold', color: colors.primary }}>{formatMoney(activeRent, currency)}</Text>
+                        </Text>
+                      </View>
+                    </View>
+
+                    {rentPayer.balance < activeRent && (
+                      <View style={{ backgroundColor: colors.destructive + '15', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.destructive + '33' }}>
+                        <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13, textAlign: 'center' }}>
+                          ⚠️ Insufficient Funds: {rentPayer.name} has only {formatMoney(rentPayer.balance, currency)}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.confirmBtns}>
+                      <Pressable
+                        onPress={() => setRentPayer(null)}
+                        style={({ pressed }) => [
+                          styles.confirmCancel,
+                          { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+                        ]}
+                      >
+                        <Text style={[styles.confirmCancelText, { color: colors.foreground }]}>Cancel</Text>
+                      </Pressable>
+                      <Pressable
+                        disabled={rentPayer.balance < activeRent}
+                        onPress={() => {
+                          const ok = transfer(
+                            rentPayer.id,
+                            owner.id,
+                            activeRent,
+                            'transfer',
+                            `Rent for ${property.name}`
+                          );
+                          if (ok) {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            setTxConfirm({
+                              emoji: '💸',
+                              title: 'Rent Paid',
+                              sub: `${rentPayer.name} paid ${formatMoney(activeRent, currency)} to ${owner.name}`
+                            });
+                          }
+                        }}
+                        style={({ pressed }) => [
+                          styles.confirmBuy,
+                          {
+                            backgroundColor: rentPayer.balance >= activeRent ? colors.success : colors.muted,
+                            opacity: rentPayer.balance < activeRent ? 0.5 : pressed ? 0.8 : 1,
+                          },
+                        ]}
+                      >
+                        <Text style={styles.confirmBuyText}>Confirm Pay</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  /* ── Player List for selection ── */
+                  <View style={{ gap: 8 }}>
+                    {players
+                      .filter(p => p.id !== owner.id && !p.isBankrupt)
+                      .map(payer => (
+                        <Pressable
+                          key={payer.id}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setRentPayer(payer);
+                          }}
+                          style={({ pressed }) => [
+                            styles.rentPayBtn,
+                            {
+                              backgroundColor: payer.color + '15',
+                              borderColor: payer.color + '66',
+                              opacity: pressed ? 0.8 : 1,
+                            },
+                          ]}
+                        >
+                          <PlayerAvatar name={payer.name} color={payer.color} size={24} />
+                          <Text style={[styles.rentPayBtnText, { color: colors.foreground }]}>
+                            {payer.name} pays <Text style={{ fontFamily: 'Inter_700Bold', color: colors.primary }}>{formatMoney(activeRent, currency)}</Text>
+                          </Text>
+                          <MaterialCommunityIcons name="chevron-right" size={16} color={colors.mutedForeground} />
+                        </Pressable>
+                      ))}
+                    {players.filter(p => p.id !== owner.id && !p.isBankrupt).length === 0 && (
+                      <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: 'italic' }}>
+                        No other active players to pay rent.
+                      </Text>
+                    )}
+                  </View>
                 )}
               </View>
             )}
 
             {/* Rent table */}
             <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Rent</Text>
-            {[
-              { label: 'Base', value: property.rent },
-              { label: '1 House', value: property.rentWith1 },
-              { label: '2 Houses', value: property.rentWith2 },
-              { label: '3 Houses', value: property.rentWith3 },
-              { label: '4 Houses', value: property.rentWith4 },
-              { label: 'Hotel', value: property.rentWithHotel },
-            ].filter(r => r.value > 0).map(r => (
-              <View key={r.label} style={[styles.rentRow, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.rentLabel, { color: colors.mutedForeground }]}>{r.label}</Text>
-                <Text style={[styles.rentValue, { color: colors.foreground }]}>{formatMoney(r.value, currency)}</Text>
+            {(() => {
+              if (property.type === 'property') {
+                const activeLabel = ownership.isMortgaged
+                  ? null
+                  : ownership.hotel
+                  ? 'Hotel'
+                  : ownership.houses === 1
+                  ? '1 House'
+                  : ownership.houses === 2
+                  ? '2 Houses'
+                  : ownership.houses === 3
+                  ? '3 Houses'
+                  : ownership.houses === 4
+                  ? '4 Houses'
+                  : 'Base';
+                const showDoubleBase = version === 'INT' && ownsAllOfGroup && !hasBuildingsInGroup;
+                const displayBaseRent = showDoubleBase ? property.rent * 2 : property.rent;
+                return [
+                  { label: showDoubleBase ? 'Base (Doubled)' : 'Base', value: displayBaseRent, active: activeLabel === 'Base' && !!owner },
+                  { label: '1 House', value: property.rentWith1, active: activeLabel === '1 House' },
+                  { label: '2 Houses', value: property.rentWith2, active: activeLabel === '2 Houses' },
+                  { label: '3 Houses', value: property.rentWith3, active: activeLabel === '3 Houses' },
+                  { label: '4 Houses', value: property.rentWith4, active: activeLabel === '4 Houses' },
+                  { label: 'Hotel', value: property.rentWithHotel, active: activeLabel === 'Hotel' },
+                ];
+              } else if (property.type === 'railroad') {
+                if (version === 'INT') {
+                  const partnerInfo = INT_PAIRS[property.id];
+                  const labelWithPartner = partnerInfo ? `With ${partnerInfo.partnerName}` : 'With Pair';
+                  return [
+                    { label: 'Base Rent', value: property.rent, active: !ownsPartner && !!owner && !ownership.isMortgaged },
+                    { label: labelWithPartner, value: property.rentWith1, active: !!ownsPartner && !!owner && !ownership.isMortgaged },
+                  ];
+                } else {
+                  const ownerId = ownership.ownerId;
+                  const rrCount = ownerId
+                    ? propertiesList.filter(p => p.type === 'railroad' && propertyOwnerships[p.id]?.ownerId === ownerId && !propertyOwnerships[p.id]?.isMortgaged).length
+                    : 0;
+                  return [
+                    { label: '1 Owned', value: property.rent, active: rrCount === 1 && !ownership.isMortgaged },
+                    { label: '2 Owned', value: property.rentWith1, active: rrCount === 2 && !ownership.isMortgaged },
+                    { label: '3 Owned', value: property.rentWith2, active: rrCount === 3 && !ownership.isMortgaged },
+                    { label: '4 Owned', value: property.rentWith3, active: rrCount === 4 && !ownership.isMortgaged },
+                  ];
+                }
+              } else { // utility
+                if (version === 'INT') {
+                  const partnerInfo = INT_PAIRS[property.id];
+                  const labelWithPartner = partnerInfo ? `With ${partnerInfo.partnerName}` : 'With Pair';
+                  return [
+                    { label: 'Base Rent', value: property.rent, active: !ownsPartner && !!owner && !ownership.isMortgaged },
+                    { label: labelWithPartner, value: property.rentWith1, active: !!ownsPartner && !!owner && !ownership.isMortgaged },
+                  ];
+                } else {
+                  const ownerId = ownership.ownerId;
+                  const utilCount = ownerId
+                    ? propertiesList.filter(p => p.type === 'utility' && propertyOwnerships[p.id]?.ownerId === ownerId && !propertyOwnerships[p.id]?.isMortgaged).length
+                    : 0;
+                  return [
+                    { label: '1 Utility', value: property.rent, active: utilCount === 1 && !ownership.isMortgaged },
+                    { label: '2 Utilities', value: property.rentWith1, active: utilCount === 2 && !ownership.isMortgaged },
+                  ];
+                }
+              }
+            })().filter((r): r is { label: string; value: number; active: boolean } => typeof r.value === 'number' && r.value > 0).map(r => (
+              <View key={r.label} style={[
+                styles.rentRow,
+                { borderBottomColor: colors.border },
+                r.active && { backgroundColor: colors.primary + '15', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }
+              ]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {r.active && <MaterialCommunityIcons name="check-circle" size={14} color={colors.primary} />}
+                  <Text style={[styles.rentLabel, { color: r.active ? colors.primary : colors.mutedForeground, fontFamily: r.active ? 'Inter_700Bold' : 'Inter_400Regular' }]}>
+                    {r.label}
+                  </Text>
+                </View>
+                <Text style={[styles.rentValue, { color: r.active ? colors.primary : colors.foreground, fontFamily: r.active ? 'Inter_700Bold' : 'Inter_600SemiBold' }]}>
+                  {formatMoney(r.value, currency)}
+                </Text>
               </View>
             ))}
           </ScrollView>
+
+            {/* ── Transaction success popup ── */}
+            <Modal visible={!!txConfirm} transparent animationType="fade" onRequestClose={() => { setTxConfirm(null); setRentPayer(null); onClose(); }}>
+              <Pressable style={confirmStyles.overlay} onPress={() => { setTxConfirm(null); setRentPayer(null); onClose(); }}>
+                <Pressable style={[confirmStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={confirmStyles.emoji}>{txConfirm?.emoji}</Text>
+                  <Text style={[confirmStyles.title, { color: colors.foreground }]}>{txConfirm?.title}</Text>
+                  <Text style={[confirmStyles.sub, { color: colors.mutedForeground }]}>{txConfirm?.sub}</Text>
+                  <Pressable
+                    onPress={() => { setTxConfirm(null); setRentPayer(null); onClose(); }}
+                    style={({ pressed }) => [confirmStyles.okBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+                  >
+                    <Text style={[confirmStyles.okText, { color: colors.primaryForeground }]}>Done</Text>
+                  </Pressable>
+                </Pressable>
+              </Pressable>
+            </Modal>
+          </Pressable>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </Modal>
   );
 }
 
@@ -437,6 +707,7 @@ export default function PropertiesScreen() {
       >
         {PROPERTY_GROUPS.map(group => {
           const props = properties.filter(p => p.group === group);
+          if (props.length === 0) return null;
           return (
             <View key={group} style={styles.groupSection}>
               <View style={styles.groupHeader}>
@@ -573,4 +844,31 @@ const styles = StyleSheet.create({
   rentRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   rentLabel: { fontFamily: 'Inter_400Regular', fontSize: 14 },
   rentValue: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  rentPayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  rentPayBtnText: {
+    flex: 1,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+});
+
+const confirmStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  card: {
+    width: '100%', maxWidth: 360, borderRadius: 20, borderWidth: 1,
+    padding: 28, alignItems: 'center', gap: 10,
+  },
+  emoji: { fontSize: 48 },
+  title: { fontFamily: 'Inter_700Bold', fontSize: 20, textAlign: 'center' },
+  sub: { fontFamily: 'Inter_400Regular', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  okBtn: { marginTop: 8, paddingHorizontal: 40, paddingVertical: 13, borderRadius: 14 },
+  okText: { fontFamily: 'Inter_700Bold', fontSize: 16 },
 });

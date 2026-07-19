@@ -12,7 +12,7 @@ import { PlayerCard } from '@/components/PlayerCard';
 import { DiceRoller } from '@/components/DiceRoller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const MAX_PLAYERS = 5;
+const MAX_PLAYERS = 4;
 
 export default function PlayersScreen() {
   const colors = useColors();

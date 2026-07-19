@@ -55,6 +55,7 @@ export default function SettingsScreen() {
   const VERSIONS = [
     { value: 'US', label: 'US ($)' },
     { value: 'IN', label: 'India (₹)' },
+    { value: 'INT', label: 'International ($)' },
   ];
 
   function NumInput({ value, onChange, onBlur }: { value: string; onChange: (v: string) => void; onBlur?: () => void }) {
@@ -152,7 +153,31 @@ export default function SettingsScreen() {
                 <Pressable
                   key={v.value}
                   disabled={gameStarted}
-                  onPress={() => updateSettings({ version: v.value as 'US' | 'IN' })}
+                  onPress={() => {
+                    const targetVersion = v.value as 'US' | 'IN' | 'INT';
+                    let startMoney = 1500;
+                    let sal = 200;
+                    let incTax = 200;
+                    let luxTax = 100;
+                    
+                    if (targetVersion === 'IN') {
+                      startMoney = 1500;
+                      sal = 200;
+                      incTax = 200;
+                      luxTax = 100;
+                    } else if (targetVersion === 'INT') {
+                      startMoney = 25000;
+                      sal = 1500;
+                      incTax = 2000;
+                      luxTax = 1000;
+                    }
+                    
+                    updateSettings({ version: targetVersion });
+                    setStartingMoneyStr(startMoney.toString());
+                    setSalaryStr(sal.toString());
+                    setIncomeTaxStr(incTax.toString());
+                    setLuxuryTaxStr(luxTax.toString());
+                  }}
                   style={[
                     styles.chip,
                     {

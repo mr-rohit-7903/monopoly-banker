@@ -50,7 +50,7 @@ export interface PropertyOwnership {
 export interface GameSettings {
   startingMoney: number;
   currency: string;
-  version: 'US' | 'IN';
+  version: 'US' | 'IN' | 'INT';
   darkMode: 'light' | 'dark' | 'system';
   salaryAmount: number;
   incomeTaxAmount: number;
@@ -172,11 +172,14 @@ export const useGameStore = create<GameState>()(
         players: state.players.map(p => p.id === id ? { ...p, isBankrupt: true } : p),
       })),
 
-      addJailCard: (playerId) => set(state => ({
-        players: state.players.map(p =>
-          p.id === playerId ? { ...p, jailCards: p.jailCards + 1 } : p
-        ),
-      })),
+      addJailCard: (playerId) => {
+        if (get().settings.version === 'INT') return;
+        set(state => ({
+          players: state.players.map(p =>
+            p.id === playerId ? { ...p, jailCards: p.jailCards + 1 } : p
+          )
+        }))
+      },
 
       useJailCard: (playerId) => {
         const player = get().players.find(p => p.id === playerId);
@@ -296,8 +299,9 @@ export const useGameStore = create<GameState>()(
       },
 
       payJailFine: (playerId) => {
-        const { transfer } = get();
-        return transfer(playerId, null, 50, 'jail_fine', 'Paid Jail Fine ($50)');
+        const { transfer, settings } = get();
+        const fine = settings.version === 'INT' ? 500 : 50;
+        return transfer(playerId, null, fine, 'jail_fine', `Paid Jail Fine (${settings.version === 'INT' ? '$500' : '$50'})`);
       },
 
       assignProperty: (propertyId, ownerId, price) => set(state => {
@@ -470,7 +474,25 @@ export const useGameStore = create<GameState>()(
       updateSettings: (updates) => set(state => {
         const newSettings = { ...state.settings, ...updates };
         if (updates.version) {
-          newSettings.currency = updates.version === 'IN' ? '₹' : '$';
+          if (updates.version === 'IN') {
+            newSettings.currency = '₹';
+            newSettings.startingMoney = 1500;
+            newSettings.salaryAmount = 200;
+            newSettings.incomeTaxAmount = 200;
+            newSettings.luxuryTaxAmount = 100;
+          } else if (updates.version === 'INT') {
+            newSettings.currency = '$';
+            newSettings.startingMoney = 25000;
+            newSettings.salaryAmount = 2500;
+            newSettings.incomeTaxAmount = 2000;
+            newSettings.luxuryTaxAmount = 1000;
+          } else { // US
+            newSettings.currency = '$';
+            newSettings.startingMoney = 1500;
+            newSettings.salaryAmount = 200;
+            newSettings.incomeTaxAmount = 200;
+            newSettings.luxuryTaxAmount = 100;
+          }
         }
         return { settings: newSettings };
       }),
