@@ -12,8 +12,9 @@ import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { TransactionItem } from '@/components/TransactionItem';
 import { formatMoney } from '@/utils/format';
 import colorConstants from '@/constants/colors';
-import { GROUP_NAMES } from '@/constants/monopoly';
+import { getGroupName, type PropertyGroup } from '@/constants/monopoly';
 import { useProperties } from '@/hooks/useProperties';
+import { useMultiplayerPermissions } from '@/hooks/useMultiplayerPermissions';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PLAYER_COLORS = colorConstants.playerColors;
@@ -29,8 +30,10 @@ export default function PlayerDetailScreen() {
   const allPlayers = useGameStore(s => s.players);
   const transactions = useGameStore(s => s.transactions);
   const currency = useGameStore(s => s.settings.currency);
+  const version = useGameStore(s => s.settings.version);
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
   const { updatePlayer, removePlayer, transfer, declareBankrupt } = useGameStore();
+  const { canActAs, isMultiplayer } = useMultiplayerPermissions();
 
   const [name, setName] = useState(player?.name ?? '');
   const [selectedColor, setSelectedColor] = useState(player?.color ?? PLAYER_COLORS[0]);
@@ -144,12 +147,14 @@ export default function PlayerDetailScreen() {
           <MaterialCommunityIcons name="arrow-left" size={24} color={palette.foreground} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.foreground }]}>Player</Text>
+        {canActAs(safePlayer.id) && (
         <Pressable
           onPress={() => editMode ? handleSave() : setEditMode(true)}
           style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
         >
           <Text style={[styles.editBtn, { color: palette.primary }]}>{editMode ? 'Save' : 'Edit'}</Text>
         </Pressable>
+        )}
       </View>
 
       <ScrollView
@@ -245,7 +250,7 @@ export default function PlayerDetailScreen() {
                   <View style={styles.propGroupHeader}>
                     <View style={[styles.groupDot, { backgroundColor: props[0].groupColor }]} />
                     <Text style={[styles.propGroupName, { color: palette.mutedForeground }]}>
-                      {GROUP_NAMES[group as keyof typeof GROUP_NAMES] ?? group}
+                      {getGroupName(group as PropertyGroup, version) ?? group}
                     </Text>
                   </View>
                   {props.map(prop => {
@@ -293,7 +298,7 @@ export default function PlayerDetailScreen() {
         )}
 
         {/* Declare Bankrupt button */}
-        {!editMode && !safePlayer.isBankrupt && (
+        {!editMode && !safePlayer.isBankrupt && canActAs(safePlayer.id) && (
           <Pressable
             onPress={handleBankrupt}
             disabled={!canBankrupt}
@@ -323,7 +328,8 @@ export default function PlayerDetailScreen() {
           </View>
         )}
 
-        {/* Delete button — always visible at bottom */}
+        {/* Delete button — only in local mode or own player */}
+        {canActAs(safePlayer.id) && (
         <Pressable
           onPress={() => setShowDeleteModal(true)}
           style={({ pressed }) => [styles.deleteBtn, { borderColor: palette.destructive, opacity: pressed ? 0.8 : 1 }]}
@@ -331,6 +337,7 @@ export default function PlayerDetailScreen() {
           <MaterialCommunityIcons name="account-remove" size={18} color={palette.destructive} />
           <Text style={[styles.deleteBtnText, { color: palette.destructive }]}>Remove Player</Text>
         </Pressable>
+        )}
       </ScrollView>
     </View>
   );

@@ -10,9 +10,10 @@ interface Props {
   onSelect: (id: string | null) => void;
   includeBank?: boolean;
   label?: string;
+  disabledIds?: (string | null)[];
 }
 
-export function PlayerSelector({ players, selectedId, onSelect, includeBank = true, label }: Props) {
+export function PlayerSelector({ players, selectedId, onSelect, includeBank = true, label, disabledIds = [] }: Props) {
   const colors = useColors();
 
   const items = [
@@ -28,16 +29,18 @@ export function PlayerSelector({ players, selectedId, onSelect, includeBank = tr
       <View style={styles.row}>
         {items.map(item => {
           const isSelected = item.id === selectedId;
+          const isDisabled = disabledIds.includes(item.id);
           return (
             <Pressable
               key={item.id ?? 'bank'}
-              onPress={() => onSelect(item.id)}
+              onPress={() => !isDisabled && onSelect(item.id)}
+              disabled={isDisabled}
               style={({ pressed }) => [
                 styles.item,
                 {
                   backgroundColor: isSelected ? colors.primary + '22' : colors.card,
                   borderColor: isSelected ? colors.primary : colors.border,
-                  opacity: pressed ? 0.8 : 1,
+                  opacity: isDisabled ? 0.4 : pressed ? 0.8 : 1,
                 },
               ]}
             >

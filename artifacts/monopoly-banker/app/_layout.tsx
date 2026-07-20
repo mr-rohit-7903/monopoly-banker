@@ -13,6 +13,8 @@ import {
 } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { ToastContainer } from '@/components/Toast';
+import { PendingTradesOverlay } from '@/components/PendingTradesOverlay';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -20,6 +22,7 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   return (
+    <>
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
@@ -46,6 +49,9 @@ function RootLayoutNav() {
         }}
       />
     </Stack>
+    <ToastContainer />
+    <PendingTradesOverlay />
+    </>
   );
 }
 

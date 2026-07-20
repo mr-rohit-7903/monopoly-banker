@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
 import { useGameStore, calculateFreeParkingPot } from '@/store/gameStore';
+import { useMultiplayerPermissions } from '@/hooks/useMultiplayerPermissions';
 import { PlayerSelector } from '@/components/PlayerSelector';
 import { AmountInput } from '@/components/AmountInput';
 import { CardDrawModal, CHANCE_COLOR, COMMUNITY_COLOR } from '@/components/CardDrawModal';
@@ -260,22 +261,36 @@ export default function BankingScreen() {
   const players = useGameStore(s => s.players).filter(p => !p.isBankrupt);
   const { chanceCards, communityChestCards } = useCards();
   const settings = useGameStore(s => s.settings);
-  const { transfer, collectSalary, payJailFine, useJailCard, claimFreeParking } = useGameStore();
+  const { transfer, collectSalary, claimFreeParking, payJailFine, useJailCard } = useGameStore();
+  const { canSpendAs, canActAs, isMultiplayer, myPlayerId } = useMultiplayerPermissions();
   const transactions = useGameStore(s => s.transactions);
   const pot = calculateFreeParkingPot(transactions);
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
   const properties = useProperties();
 
   // Transfer state
-  const [fromId, setFromId] = useState<string | null>(null);
+  const [fromId, setFromId] = useState<string | null>(isMultiplayer ? myPlayerId : null);
   const [toId, setToId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
 
   // Quick actions player
-  const [quickPlayerId, setQuickPlayerId] = useState<string | null>(null);
+  const [quickPlayerId, setQuickPlayerId] = useState<string | null>(isMultiplayer ? myPlayerId : null);
 
   // Jail modal state
   const [jailVisible, setJailVisible] = useState(false);
+
+  // Card draw state
+  const [cardDrawerId, setCardDrawerId] = useState<string | null>(isMultiplayer ? myPlayerId : null);
+  const [drawnCard, setDrawnCard] = useState<MonopolyCard | null>(null);
+  const [diceRollDeck, setDiceRollDeck] = useState<'chance' | 'community' | null>(null);
+
+  React.useEffect(() => {
+    if (isMultiplayer && myPlayerId) {
+      if (fromId !== myPlayerId) setFromId(myPlayerId);
+      if (quickPlayerId !== myPlayerId) setQuickPlayerId(myPlayerId);
+      if (cardDrawerId !== myPlayerId) setCardDrawerId(myPlayerId);
+    }
+  }, [isMultiplayer, myPlayerId]);
 
   // Transaction success confirmation
   const [txConfirm, setTxConfirm] = useState<{ emoji: string; title: string; sub: string } | null>(null);
@@ -287,10 +302,7 @@ export default function BankingScreen() {
     setTxConfirm({ emoji, title, sub });
   }
 
-  // Card draw state
-  const [cardDrawerId, setCardDrawerId] = useState<string | null>(null);
-  const [drawnCard, setDrawnCard] = useState<MonopolyCard | null>(null);
-  const [diceRollDeck, setDiceRollDeck] = useState<'chance' | 'community' | null>(null);
+
 
   const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
@@ -329,17 +341,27 @@ export default function BankingScreen() {
         showConfirm('🎉', 'Free Parking Claimed', `${playerName} won the pot of ${formatMoney(claimedAmount, settings.currency)}!`);
       }
     } else if (action === 'party_house' || action === 'resort') {
-      const label = action === 'party_house' ? 'Party House' : 'Resort';
-      const payerList = players.filter(p => p.id !== quickPlayerId && !p.isBankrupt);
+      const isResort = action === 'resort';
+      const label = isResort ? 'Resort' : 'Party House';
+      const otherPlayers = players.filter(p => p.id !== quickPlayerId && !p.isBankrupt);
       let successCount = 0;
-      payerList.forEach(p => {
-        if (p.balance >= 200) {
-          const ok = transfer(p.id, quickPlayerId, 200, 'transfer', `${label} — from ${p.name}`);
+      otherPlayers.forEach(p => {
+        if (isResort) {
+          const ok = transfer(quickPlayerId, p.id, 200, 'transfer', `${label} — to ${p.name}`);
           if (ok) successCount++;
+        } else {
+          if (p.balance >= 200) {
+            const ok = transfer(p.id, quickPlayerId, 200, 'transfer', `${label} — from ${p.name}`);
+            if (ok) successCount++;
+          }
         }
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showConfirm('🎉', `${label} Visited`, `${playerName} collected ${formatMoney(200, settings.currency)} from ${successCount} players`);
+      if (isResort) {
+        showConfirm('🎉', `${label} Visited`, `${playerName} paid ${formatMoney(200, settings.currency)} to ${successCount} players`);
+      } else {
+        showConfirm('🎉', `${label} Visited`, `${playerName} collected ${formatMoney(200, settings.currency)} from ${successCount} players`);
+      }
     } else {
       let amt = action === 'income' ? settings.incomeTaxAmount : settings.luxuryTaxAmount;
       let label = action === 'income' ? 'Income Tax' : 'Luxury Tax';
@@ -592,7 +614,14 @@ export default function BankingScreen() {
         {/* ── Transfer money ── */}
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Transfer Money</Text>
-          <PlayerSelector players={players} selectedId={fromId} onSelect={setFromId} includeBank label="From" />
+          <PlayerSelector 
+            players={players} 
+            selectedId={fromId} 
+            onSelect={setFromId} 
+            includeBank={!isMultiplayer} 
+            label="From" 
+            disabledIds={[...players.map(p => p.id).filter(id => !canSpendAs(id)), ...(isMultiplayer ? [null] : [])]}
+          />
           <View style={styles.arrowRow}>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={[styles.arrowBox, { backgroundColor: colors.muted }]}>
@@ -628,10 +657,14 @@ export default function BankingScreen() {
               return (
                 <Pressable
                   key={p.id}
-                  onPress={() => setQuickPlayerId(sel ? null : p.id)}
+                  onPress={() => canActAs(p.id) && setQuickPlayerId(sel ? null : p.id)}
                   style={({ pressed }) => [
                     styles.playerChip,
-                    { backgroundColor: sel ? p.color + '22' : colors.muted, borderColor: sel ? p.color : colors.border, opacity: pressed ? 0.8 : 1 },
+                    { 
+                      backgroundColor: sel ? p.color + '22' : colors.muted, 
+                      borderColor: sel ? p.color : colors.border, 
+                      opacity: !canActAs(p.id) ? 0.3 : pressed ? 0.8 : 1 
+                    },
                   ]}
                 >
                   <View style={[styles.dot, { backgroundColor: p.color }]} />
@@ -674,7 +707,7 @@ export default function BankingScreen() {
                   action: () => handleQuick('luxury') 
                 },
                 { label: 'Party House', sub: `+${formatMoney(200, settings.currency)} from each`, icon: 'gift-outline' as any, color: '#E91E63', action: () => handleQuick('party_house') },
-                { label: 'Resorts', sub: `+${formatMoney(200, settings.currency)} from each`, icon: 'beach' as any, color: '#00BCD4', action: () => handleQuick('resort') },
+                { label: 'Resorts', sub: `-${formatMoney(200, settings.currency)} to each`, icon: 'beach' as any, color: '#00BCD4', action: () => handleQuick('resort') },
               ] : [
                 { label: 'Collect Salary', sub: `+${formatMoney(settings.salaryAmount, settings.currency)}`, icon: 'cash-plus' as any, color: colors.success, action: () => handleQuick('salary') },
                 { label: 'Income Tax',     sub: `-${formatMoney(settings.incomeTaxAmount, settings.currency)}`, icon: 'file-document' as any, color: colors.warning, action: () => handleQuick('income') },
@@ -733,10 +766,14 @@ export default function BankingScreen() {
               return (
                 <Pressable
                   key={p.id}
-                  onPress={() => setCardDrawerId(sel ? null : p.id)}
+                  onPress={() => canActAs(p.id) && setCardDrawerId(sel ? null : p.id)}
                   style={({ pressed }) => [
                     styles.playerChip,
-                    { backgroundColor: sel ? p.color + '22' : colors.muted, borderColor: sel ? p.color : colors.border, opacity: pressed ? 0.8 : 1 },
+                    { 
+                      backgroundColor: sel ? p.color + '22' : colors.muted, 
+                      borderColor: sel ? p.color : colors.border, 
+                      opacity: !canActAs(p.id) ? 0.3 : pressed ? 0.8 : 1 
+                    },
                   ]}
                 >
                   <View style={[styles.dot, { backgroundColor: p.color }]} />

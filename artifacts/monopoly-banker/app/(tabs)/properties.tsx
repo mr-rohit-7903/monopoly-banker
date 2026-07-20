@@ -7,7 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useGameStore, Player } from '@/store/gameStore';
-import { PROPERTY_GROUPS, GROUP_NAMES, MonopolyProperty, GROUP_COLORS } from '@/constants/monopoly';
+import { useMultiplayerPermissions } from '@/hooks/useMultiplayerPermissions';
+import { PROPERTY_GROUPS, MonopolyProperty, getGroupColor, getGroupName } from '@/constants/monopoly';
 import { useProperties } from '@/hooks/useProperties';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { AmountInput } from '@/components/AmountInput';
@@ -33,6 +34,7 @@ function PropertyDetailModal({
   const currency = useGameStore(s => s.settings.currency);
   const version = useGameStore(s => s.settings.version);
   const { assignProperty, setHouses, toggleMortgage, transfer } = useGameStore();
+  const { canActAs, canSpendAs } = useMultiplayerPermissions();
   const propertiesList = useProperties();
 
   const groupProps = property ? propertiesList.filter(p => p.group === property.group) : [];
@@ -216,9 +218,11 @@ function PropertyDetailModal({
                 ) : (
                   <View style={styles.ownerRow}>
                     {players.map(p => {
+                      const allowed = canSpendAs(p.id);
                       return (
                         <Pressable
                           key={p.id}
+                          disabled={!allowed}
                           onPress={() => {
                             setBuyTarget(p);
                             setBuyPriceStr(property.price.toString());
@@ -228,6 +232,7 @@ function PropertyDetailModal({
                             {
                               backgroundColor: colors.muted,
                               borderColor: colors.border,
+                              opacity: allowed ? 1 : 0.35,
                             },
                           ]}
                         >
@@ -247,7 +252,7 @@ function PropertyDetailModal({
             )}
 
             {/* Houses/Hotels for properties */}
-            {property.type === 'property' && owner && (() => {
+            {property.type === 'property' && owner && canActAs(owner.id) && (() => {
               const isAnyGroupPropertyMortgaged = groupProps.some(
                 p => useGameStore.getState().propertyOwnerships[p.id]?.isMortgaged
               );
@@ -281,7 +286,7 @@ function PropertyDetailModal({
                 }
               } else {
                 if (!ownsAllOfGroup) {
-                  buyDisableReason = `Requires all ${GROUP_NAMES[property.group]} properties`;
+                  buyDisableReason = `Requires all ${getGroupName(property.group, version)} properties`;
                 } else if (isAnyGroupPropertyMortgaged) {
                   buyDisableReason = 'Cannot build while a property in group is mortgaged';
                 } else if (currentCount >= maxBuildings) {
@@ -430,7 +435,7 @@ function PropertyDetailModal({
             })()}
 
             {/* Mortgage */}
-            {owner && (
+            {owner && canActAs(owner.id) && (
               <View style={{ gap: 4 }}>
                 <Pressable
                   onPress={() => { toggleMortgage(property.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
@@ -536,9 +541,12 @@ function PropertyDetailModal({
                   <View style={{ gap: 8 }}>
                     {players
                       .filter(p => p.id !== owner.id && !p.isBankrupt)
-                      .map(payer => (
+                      .map(payer => {
+                        const allowed = canSpendAs(payer.id);
+                        return (
                         <Pressable
                           key={payer.id}
+                          disabled={!allowed}
                           onPress={() => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             setRentPayer(payer);
@@ -548,7 +556,7 @@ function PropertyDetailModal({
                             {
                               backgroundColor: payer.color + '15',
                               borderColor: payer.color + '66',
-                              opacity: pressed ? 0.8 : 1,
+                              opacity: !allowed ? 0.35 : pressed ? 0.8 : 1,
                             },
                           ]}
                         >
@@ -558,7 +566,7 @@ function PropertyDetailModal({
                           </Text>
                           <MaterialCommunityIcons name="chevron-right" size={16} color={colors.mutedForeground} />
                         </Pressable>
-                      ))}
+                      );})}
                     {players.filter(p => p.id !== owner.id && !p.isBankrupt).length === 0 && (
                       <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: 'italic' }}>
                         No other active players to pay rent.
@@ -686,6 +694,7 @@ export default function PropertiesScreen() {
   const propertyOwnerships = useGameStore(s => s.propertyOwnerships);
   const players = useGameStore(s => s.players);
   const currency = useGameStore(s => s.settings.currency);
+  const version = useGameStore(s => s.settings.version);
 
   const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
@@ -711,8 +720,8 @@ export default function PropertiesScreen() {
           return (
             <View key={group} style={styles.groupSection}>
               <View style={styles.groupHeader}>
-                <View style={[styles.groupDot, { backgroundColor: GROUP_COLORS[group] }]} />
-                <Text style={[styles.groupName, { color: colors.foreground }]}>{GROUP_NAMES[group]}</Text>
+                <View style={[styles.groupDot, { backgroundColor: getGroupColor(group, version) }]} />
+                <Text style={[styles.groupName, { color: colors.foreground }]}>{getGroupName(group, version)}</Text>
               </View>
               <View style={styles.propGrid}>
                 {props.map(prop => {

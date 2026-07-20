@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Modal, Platform, Pressable, ScrollView,
+  Alert, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,9 +8,11 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useGameStore } from '@/store/gameStore';
+import { useMultiplayerStore } from '@/store/multiplayerStore';
 import { PlayerCard } from '@/components/PlayerCard';
 import { DiceRoller } from '@/components/DiceRoller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { OnboardingScreen } from '@/components/OnboardingScreen';
 
 const MAX_PLAYERS = 4;
 
@@ -24,6 +26,31 @@ export default function PlayersScreen() {
 
   const { restartGame } = useGameStore();
   const [winnerAcknowledged, setWinnerAcknowledged] = useState(false);
+  const [hasSeenCode, setHasSeenCode] = useState(false);
+
+  const appMode = useGameStore(s => s.appMode);
+
+  // Multiplayer state
+  const mpStatus = useMultiplayerStore(s => s.status);
+  const roomCode = useMultiplayerStore(s => s.roomCode);
+  const isHost = useMultiplayerStore(s => s.isHost);
+  const myName = useMultiplayerStore(s => s.myName);
+  const firebaseConfigured = useMultiplayerStore(s => s.firebaseConfigured);
+  const mpError = useMultiplayerStore(s => s.error);
+
+  const { leaveGame, checkFirebaseConfig } = useMultiplayerStore();
+
+  // Check firebase config on mount
+  useEffect(() => {
+    checkFirebaseConfig();
+  }, []);
+
+  // Reset code modal when leaving room
+  useEffect(() => {
+    if (!roomCode) {
+      setHasSeenCode(false);
+    }
+  }, [roomCode]);
 
   const topPad = Platform.OS === 'web' ? 16 : insets.top;
   const canAddPlayer = players.length < MAX_PLAYERS && transactions.length === 0;
@@ -36,6 +63,10 @@ export default function PlayersScreen() {
     restartGame();
     setWinnerAcknowledged(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  if (!appMode) {
+    return <OnboardingScreen />;
   }
 
   return (
@@ -68,6 +99,32 @@ export default function PlayersScreen() {
         </View>
       </Modal>
 
+      {/* Room Code Modal */}
+      <Modal visible={isHost && !!roomCode && !hasSeenCode} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={[styles.winnerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <MaterialCommunityIcons name="party-popper" size={48} color={colors.primary} />
+            <Text style={[styles.winnerTitle, { color: colors.foreground }]}>Room Created!</Text>
+            <Text style={[styles.winnerSub, { color: colors.mutedForeground }]}>
+              Share this code with other players so they can join your game.
+            </Text>
+            
+            <View style={{ backgroundColor: colors.background, padding: 16, borderRadius: 12, marginBottom: 20, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 36, letterSpacing: 8, color: colors.foreground }}>
+                {roomCode}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => setHasSeenCode(true)}
+              style={({ pressed }) => [{ width: '100%', paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Text style={styles.winnerConfirmText}>Got it</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View>
@@ -96,6 +153,7 @@ export default function PlayersScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Player List */}
         {players.length === 0 ? (
           <View style={styles.empty}>
             <MaterialCommunityIcons name="account-group" size={56} color={colors.border} />
@@ -118,7 +176,7 @@ export default function PlayersScreen() {
         )}
       </ScrollView>
 
-      {canAddPlayer && (
+      {canAddPlayer && appMode === 'offline' && (
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -155,7 +213,7 @@ const styles = StyleSheet.create({
   headerSub: { fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: 10 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  scroll: { padding: 16, gap: 4 },
+  scroll: { padding: 16, gap: 12 },
   hint: { fontFamily: 'Inter_400Regular', fontSize: 12, marginBottom: 8 },
   empty: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTitle: { fontFamily: 'Inter_700Bold', fontSize: 20 },
@@ -193,4 +251,28 @@ const styles = StyleSheet.create({
   winnerCancelText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
   winnerConfirm: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   winnerConfirmText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#fff' },
+  // Multiplayer Card
+  mpCard: {
+    borderRadius: 16, borderWidth: 1, padding: 16, gap: 10,
+  },
+  mpCardHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  mpCardTitle: { fontFamily: 'Inter_700Bold', fontSize: 16 },
+  mpCardSub: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18 },
+  mpLiveDot: { width: 8, height: 8, borderRadius: 4 },
+  mpLiveText: { fontFamily: 'Inter_700Bold', fontSize: 13 },
+  mpRoleBadge: {
+    fontFamily: 'Inter_700Bold', fontSize: 10, paddingHorizontal: 8,
+    paddingVertical: 3, borderRadius: 6, letterSpacing: 1,
+  },
+  mpCodeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  mpCodeLabel: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+  mpCode: { fontFamily: 'Inter_700Bold', fontSize: 28, letterSpacing: 6 },
+  mpMyName: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  mpLeaveBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, marginTop: 4,
+  },
+  mpLeaveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
 });

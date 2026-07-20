@@ -20,18 +20,8 @@ export interface MonopolyProperty {
   type: 'property' | 'railroad' | 'utility';
 }
 
-// To avoid circular dependency during import, we access useGameStore dynamically
-let _useGameStore: any = null;
-function getGameStore() {
-  if (!_useGameStore) {
-    try {
-      _useGameStore = require('@/store/gameStore').useGameStore;
-    } catch (e) {
-      // ignore
-    }
-  }
-  return _useGameStore;
-}
+// Removed dynamic require to avoid circular dependency
+
 
 const VERSION_GROUP_NAMES: Record<string, Record<PropertyGroup, string>> = {
   US: {
@@ -111,55 +101,13 @@ const VERSION_GROUP_COLORS: Record<string, Record<PropertyGroup, string>> = {
   },
 };
 
-export const GROUP_COLORS = new Proxy({} as Record<PropertyGroup, string>, {
-  get(_, prop: PropertyGroup) {
-    try {
-      const store = getGameStore();
-      const version = store?.getState()?.settings?.version || 'US';
-      return VERSION_GROUP_COLORS[version]?.[prop] || VERSION_GROUP_COLORS.US[prop];
-    } catch {
-      return VERSION_GROUP_COLORS.US[prop];
-    }
-  },
-  ownKeys() {
-    return Reflect.ownKeys(VERSION_GROUP_COLORS.US);
-  },
-  getOwnPropertyDescriptor(target, prop) {
-    try {
-      const store = getGameStore();
-      const version = store?.getState()?.settings?.version || 'US';
-      const val = VERSION_GROUP_COLORS[version]?.[prop as PropertyGroup] || VERSION_GROUP_COLORS.US[prop as PropertyGroup];
-      return { enumerable: true, configurable: true, value: val };
-    } catch {
-      return { enumerable: true, configurable: true, value: VERSION_GROUP_COLORS.US[prop as PropertyGroup] };
-    }
-  }
-});
+export function getGroupColor(group: PropertyGroup, version: string = 'US'): string {
+  return VERSION_GROUP_COLORS[version]?.[group] || VERSION_GROUP_COLORS.US[group];
+}
 
-export const GROUP_NAMES = new Proxy({} as Record<PropertyGroup, string>, {
-  get(_, prop: PropertyGroup) {
-    try {
-      const store = getGameStore();
-      const version = store?.getState()?.settings?.version || 'US';
-      return VERSION_GROUP_NAMES[version]?.[prop] || VERSION_GROUP_NAMES.US[prop];
-    } catch {
-      return VERSION_GROUP_NAMES.US[prop];
-    }
-  },
-  ownKeys() {
-    return Reflect.ownKeys(VERSION_GROUP_NAMES.US);
-  },
-  getOwnPropertyDescriptor(target, prop) {
-    try {
-      const store = getGameStore();
-      const version = store?.getState()?.settings?.version || 'US';
-      const val = VERSION_GROUP_NAMES[version]?.[prop as PropertyGroup] || VERSION_GROUP_NAMES.US[prop as PropertyGroup];
-      return { enumerable: true, configurable: true, value: val };
-    } catch {
-      return { enumerable: true, configurable: true, value: VERSION_GROUP_NAMES.US[prop as PropertyGroup] };
-    }
-  }
-});
+export function getGroupName(group: PropertyGroup, version: string = 'US'): string {
+  return VERSION_GROUP_NAMES[version]?.[group] || VERSION_GROUP_NAMES.US[group];
+}
 
 import { VERSIONS } from './versions';
 

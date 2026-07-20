@@ -57,6 +57,18 @@ export interface GameSettings {
   luxuryTaxAmount: number;
 }
 
+export interface PendingTrade {
+  id: string;
+  initiatorId: string;
+  playerAId: string;
+  playerBId: string;
+  moneyAtoB: number;
+  moneyBtoA: number;
+  propsAtoB: string[];
+  propsBtoA: string[];
+  timestamp: number;
+}
+
 const DEFAULT_SETTINGS: GameSettings = {
   startingMoney: STANDARD_STARTING_MONEY,
   currency: '$',
@@ -81,9 +93,11 @@ interface GameState {
   propertyOwnerships: Record<string, PropertyOwnership>;
   settings: GameSettings;
   gameStartTime: number;
+  appMode: 'offline' | 'online' | null;
+  pendingTrades: PendingTrade[];
 
   // Player actions
-  addPlayer: (name: string, color: string) => void;
+  addPlayer: (name: string, color: string) => string;
   removePlayer: (id: string) => void;
   updatePlayer: (id: string, updates: { name?: string; color?: string }) => void;
   declareBankrupt: (id: string) => void;
@@ -95,6 +109,7 @@ interface GameState {
   undoLastTransaction: () => void;
   collectSalary: (playerId: string) => void;
   payJailFine: (playerId: string) => boolean;
+  setAppMode: (mode: 'offline' | 'online' | null) => void;
 
   // Property actions
   assignProperty: (propertyId: string, ownerId: string | null, price: number) => void;
@@ -110,6 +125,9 @@ interface GameState {
     propsAtoB: string[];     // property IDs A gives to B
     propsBtoA: string[];     // property IDs B gives to A
   }) => boolean;
+  proposeTrade: (trade: Omit<PendingTrade, 'id' | 'timestamp'>) => void;
+  acceptTrade: (tradeId: string) => boolean;
+  rejectTrade: (tradeId: string) => void;
 
   // Game actions
   resetGame: () => void;
@@ -138,18 +156,25 @@ export const useGameStore = create<GameState>()(
       propertyOwnerships: initOwnerships(),
       settings: DEFAULT_SETTINGS,
       gameStartTime: Date.now(),
+      appMode: null,
+      pendingTrades: [],
 
-      addPlayer: (name, color) => set(state => ({
-        players: [...state.players, {
-          id: genId(),
-          name: name.trim(),
-          color,
-          balance: state.settings.startingMoney,
-          jailCards: 0,
-          isBankrupt: false,
-        }],
-        // Joining is not a transaction — don't log it so the Add Player button stays visible
-      })),
+      setAppMode: (mode) => set({ appMode: mode }),
+
+      addPlayer: (name, color) => {
+        const id = genId();
+        set(state => ({
+          players: [...state.players, {
+            id,
+            name: name.trim(),
+            color,
+            balance: state.settings.startingMoney,
+            jailCards: 0,
+            isBankrupt: false,
+          }],
+        }));
+        return id;
+      },
 
       removePlayer: (id) => set(state => {
         const player = state.players.find(p => p.id === id);
@@ -200,7 +225,6 @@ export const useGameStore = create<GameState>()(
       transfer: (fromId, toId, amount, type, description) => {
         const state = get();
         if (amount <= 0) return false;
-        // Only check player balances — bank is unlimited
         if (fromId !== null) {
           const from = state.players.find(p => p.id === fromId);
           if (!from || from.balance < amount || from.isBankrupt) return false;
@@ -268,14 +292,12 @@ export const useGameStore = create<GameState>()(
           }
         }
 
-        // Restore consumed jail card
         if (type === 'jail_card' && fromId !== null) {
           players = players.map(p =>
             p.id === fromId ? { ...p, jailCards: p.jailCards + 1 } : p
           );
         }
 
-        // Reverse the money flow (bank is unlimited — only adjust player balances)
         if (fromId === null && toId !== null) {
           players = players.map(p => p.id === toId ? { ...p, balance: p.balance - amount } : p);
         } else if (fromId !== null && toId === null) {
@@ -311,7 +333,6 @@ export const useGameStore = create<GameState>()(
         const transactions = [...state.transactions];
 
         if (ownerId !== null && price > 0) {
-          // Player buying from bank — deduct from player only (bank is unlimited)
           const buyer = state.players.find(p => p.id === ownerId);
           if (!buyer || buyer.balance < price) return state;
           players = players.map(p => p.id === ownerId ? { ...p, balance: p.balance - price } : p);
@@ -322,7 +343,6 @@ export const useGameStore = create<GameState>()(
             timestamp: Date.now(), propertyId, prevOwnerId,
           });
         } else if (ownerId !== null && price === 0 && prevOwnerId !== null) {
-          // Player-to-player trade (no money changes hands)
           const propName = getProperties(state.settings.version).find(p => p.id === propertyId)?.name;
           transactions.push({
             id: genId(), type: 'property_buy', fromId: ownerId, toId: null,
@@ -330,7 +350,6 @@ export const useGameStore = create<GameState>()(
             timestamp: Date.now(), propertyId, prevOwnerId,
           });
         }
-        // Returning a property to the bank is not allowed once purchased
 
         return {
           players,
@@ -389,21 +408,18 @@ export const useGameStore = create<GameState>()(
         };
       }),
 
-      executeTrade: ({ playerAId, playerBId, moneyAtoB, moneyBtoA, propsAtoB, propsBtoA }) => {
+      executeTrade: ({ playerAId, playerBId, moneyAtoB = 0, moneyBtoA = 0, propsAtoB = [], propsBtoA = [] }) => {
         const state = get();
         const playerA = state.players.find(p => p.id === playerAId);
         const playerB = state.players.find(p => p.id === playerBId);
         if (!playerA || !playerB || playerA.isBankrupt || playerB.isBankrupt) return false;
 
-        // Net money change for each player
-        const netA = moneyBtoA - moneyAtoB; // positive = A receives net
-        const netB = moneyAtoB - moneyBtoA; // positive = B receives net
+        const netA = moneyBtoA - moneyAtoB;
+        const netB = moneyAtoB - moneyBtoA;
 
-        // Check balances
         if (playerA.balance + netA < 0) return false;
         if (playerB.balance + netB < 0) return false;
 
-        // Validate property ownership
         for (const pid of propsAtoB) {
           if (state.propertyOwnerships[pid]?.ownerId !== playerAId) return false;
         }
@@ -411,7 +427,6 @@ export const useGameStore = create<GameState>()(
           if (state.propertyOwnerships[pid]?.ownerId !== playerBId) return false;
         }
 
-        // Build description
         const parts: string[] = [];
         if (moneyAtoB > 0) parts.push(`${playerA.name} pays ${state.settings.currency}${moneyAtoB}`);
         if (moneyBtoA > 0) parts.push(`${playerB.name} pays ${state.settings.currency}${moneyBtoA}`);
@@ -452,11 +467,43 @@ export const useGameStore = create<GameState>()(
         return true;
       },
 
+      proposeTrade: (trade) => {
+        const id = genId();
+        set((state) => ({
+          pendingTrades: [...(state.pendingTrades || []), { ...trade, id, timestamp: Date.now() }]
+        }));
+      },
+
+      acceptTrade: (tradeId) => {
+        const state = get();
+        const trade = state.pendingTrades.find(t => t.id === tradeId);
+        if (!trade) return false;
+        const ok = state.executeTrade({
+          playerAId: trade.playerAId,
+          playerBId: trade.playerBId,
+          moneyAtoB: trade.moneyAtoB,
+          moneyBtoA: trade.moneyBtoA,
+          propsAtoB: trade.propsAtoB,
+          propsBtoA: trade.propsBtoA,
+        });
+
+        if (ok) {
+          set(s => ({ pendingTrades: s.pendingTrades.filter(t => t.id !== tradeId) }));
+        }
+        return ok;
+      },
+
+      rejectTrade: (tradeId) => {
+        set(s => ({ pendingTrades: s.pendingTrades.filter(t => t.id !== tradeId) }));
+      },
+
       resetGame: () => set({
         players: [],
         transactions: [],
         propertyOwnerships: initOwnerships(),
         gameStartTime: Date.now(),
+        appMode: null,
+        pendingTrades: [],
       }),
 
       restartGame: () => set(state => ({
@@ -483,7 +530,7 @@ export const useGameStore = create<GameState>()(
           } else if (updates.version === 'INT') {
             newSettings.currency = '$';
             newSettings.startingMoney = 25000;
-            newSettings.salaryAmount = 2500;
+            newSettings.salaryAmount = 1500;
             newSettings.incomeTaxAmount = 2000;
             newSettings.luxuryTaxAmount = 1000;
           } else { // US

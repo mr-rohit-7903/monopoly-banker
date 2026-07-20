@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View,
@@ -7,10 +7,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useGameStore, Player } from '@/store/gameStore';
+import { useMultiplayerPermissions } from '@/hooks/useMultiplayerPermissions';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
-import { GROUP_NAMES, type PropertyGroup } from '@/constants/monopoly';
+import { type PropertyGroup } from '@/constants/monopoly';
 import { useProperties } from '@/hooks/useProperties';
 import { formatMoney } from '@/utils/format';
+import { useMultiplayerStore } from '@/store/multiplayerStore';
+import { toast } from '@/components/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TradeScreen() {
@@ -22,6 +25,9 @@ export default function TradeScreen() {
   const currency = useGameStore(s => s.settings.currency);
   const version = useGameStore(s => s.settings.version);
   const executeTrade = useGameStore(s => s.executeTrade);
+  const proposeTrade = useGameStore(s => s.proposeTrade);
+  const myPlayerId = useMultiplayerStore(s => s.myPlayerId);
+  const { isMultiplayer, canActAs } = useMultiplayerPermissions();
 
   const topPad = Platform.OS === 'web' ? 16 : insets.top;
 
@@ -37,6 +43,13 @@ export default function TradeScreen() {
 
   // Selecting players
   const [selectingFor, setSelectingFor] = useState<'A' | 'B' | null>(null);
+
+  // In multiplayer, auto-lock Player A to yourself
+  useEffect(() => {
+    if (isMultiplayer && myPlayerId) {
+      setPlayerAId(myPlayerId);
+    }
+  }, [isMultiplayer, myPlayerId]);
 
   const playerA = players.find(p => p.id === playerAId) ?? null;
   const playerB = players.find(p => p.id === playerBId) ?? null;
@@ -77,7 +90,7 @@ export default function TradeScreen() {
   }
 
   function resetTrade() {
-    setPlayerAId(null);
+    if (!isMultiplayer) setPlayerAId(null);
     setPlayerBId(null);
     setMoneyAtoB('');
     setMoneyBtoA('');
@@ -97,26 +110,47 @@ export default function TradeScreen() {
       return;
     }
 
-    const ok = executeTrade({
-      playerAId,
-      playerBId,
-      moneyAtoB: mAtoB,
-      moneyBtoA: mBtoA,
-      propsAtoB,
-      propsBtoA,
-    });
+    if (isMultiplayer) {
+      if (!myPlayerId) {
+        toast.error('You are not a player in this game!');
+        return;
+      }
+      
+      proposeTrade({
+        initiatorId: myPlayerId,
+        playerAId,
+        playerBId,
+        moneyAtoB: mAtoB,
+        moneyBtoA: mBtoA,
+        propsAtoB,
+        propsBtoA,
+      });
 
-    if (!ok) {
-      setShowError('Trade failed — check player balances and property ownership');
-      return;
-    }
-
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.info('Trade proposed. Waiting for approval.');
       resetTrade();
-    }, 1500);
+    } else {
+      const ok = executeTrade({
+        playerAId,
+        playerBId,
+        moneyAtoB: mAtoB,
+        moneyBtoA: mBtoA,
+        propsAtoB,
+        propsBtoA,
+      });
+
+      if (!ok) {
+        setShowError('Trade failed — check player balances and property ownership');
+        return;
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        resetTrade();
+      }, 1500);
+    }
   }
 
   const hasAnything = (parseInt(moneyAtoB) || 0) > 0 || (parseInt(moneyBtoA) || 0) > 0 || propsAtoB.length > 0 || propsBtoA.length > 0;
@@ -155,10 +189,15 @@ export default function TradeScreen() {
         <Pressable style={styles.selectorOverlay} onPress={() => setSelectingFor(null)}>
           <Pressable style={[styles.selectorCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
             <Text style={[styles.selectorTitle, { color: palette.foreground }]}>
-              Select Player {selectingFor}
+              {isMultiplayer ? 'Trade With' : `Select Player ${selectingFor}`}
             </Text>
             {players
-              .filter(p => selectingFor === 'A' ? p.id !== playerBId : p.id !== playerAId)
+              .filter(p => {
+                // In multiplayer, only show other players (not yourself)
+                if (isMultiplayer) return p.id !== myPlayerId;
+                // Offline: don't show the player already in the other slot
+                return selectingFor === 'A' ? p.id !== playerBId : p.id !== playerAId;
+              })
               .map(p => (
                 <Pressable
                   key={p.id}
@@ -219,17 +258,35 @@ export default function TradeScreen() {
           <>
             {/* Player Selection Row */}
             <View style={styles.playersRow}>
-              <PlayerSlot
-                label="Player A"
-                player={playerA}
-                palette={palette}
-                onPress={() => setSelectingFor('A')}
-              />
+              {isMultiplayer ? (
+                // In multiplayer, Player A is locked to yourself
+                <View style={[styles.playerSlot, { backgroundColor: playerA ? palette.card : palette.muted, borderColor: playerA ? playerA.color : palette.border, borderWidth: playerA ? 2 : 1 }]}>
+                  {playerA ? (
+                    <>
+                      <PlayerAvatar name={playerA.name} color={playerA.color} size={40} />
+                      <Text style={[styles.slotName, { color: palette.foreground }]} numberOfLines={1}>{playerA.name}</Text>
+                      <Text style={[{ fontFamily: 'Inter_400Regular', fontSize: 10, color: palette.mutedForeground }]}>You</Text>
+                    </>
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="account" size={28} color={palette.mutedForeground} />
+                      <Text style={[styles.slotPlaceholder, { color: palette.mutedForeground }]}>You</Text>
+                    </>
+                  )}
+                </View>
+              ) : (
+                <PlayerSlot
+                  label="Player A"
+                  player={playerA}
+                  palette={palette}
+                  onPress={() => setSelectingFor('A')}
+                />
+              )}
               <View style={[styles.swapIcon, { backgroundColor: palette.muted }]}>
                 <MaterialCommunityIcons name="swap-horizontal" size={22} color={palette.primary} />
               </View>
               <PlayerSlot
-                label="Player B"
+                label={isMultiplayer ? 'Trade With' : 'Player B'}
                 player={playerB}
                 palette={palette}
                 onPress={() => setSelectingFor('B')}
@@ -287,7 +344,7 @@ export default function TradeScreen() {
                     color={hasAnything ? palette.primaryForeground : palette.mutedForeground}
                   />
                   <Text style={[styles.tradeBtnText, { color: hasAnything ? palette.primaryForeground : palette.mutedForeground }]}>
-                    Execute Trade
+                    {isMultiplayer ? 'Propose Trade' : 'Execute Trade'}
                   </Text>
                 </Pressable>
               </>
